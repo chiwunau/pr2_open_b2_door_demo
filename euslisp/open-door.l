@@ -62,7 +62,7 @@
            (base-tgt (send base-now :copy-worldcoords))
            knob-pos-cds 
            res)
-      (dotimes (i 10)
+      (dotimes (i 10) ;; angle of door = i * 10
         (send *door* :hinge :joint-angle (- (* (+ i 1) d)))
         (setq knob-pos-cds (send (make-coords :pos (send *door* :end-coords :worldpos) :rot (send base-tgt :worldrot)) :copy-worldcoords))
         (dotimes (j 10)
@@ -72,7 +72,9 @@
                                (elt (send (send (send knob-pos-cds :copy-worldcoords) :transform knob-base-trans) :pos) 1)
                                0.0)
                          :rot (send knob-pos-cds :copy-rot)))
-
+          
+          (when (= i 1) (send *door* :knob :joint-angle -20))
+          (when (= i 2) (send *door* :knob :joint-angle 0))
           (send *pr2* :move-to base-tgt :world)
           (setq res (send *pr2* :inverse-kinematics tgt-cds
                           :move-target (send *pr2* :larm :end-coords)
@@ -119,8 +121,7 @@
           :start-time sttm
           :send-action t)
     ))
-    
-     
+
     ;; (send (send *door* :end-coords) :assoc tgt-cds)
     ;; (dotimes (i 10)
     ;;   ;; (send *pr2* :move-to (elt base-cds-list i) :world)
