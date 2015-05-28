@@ -53,7 +53,7 @@
     ;;   (push (make-coords :pos (midpoint (/ (+ i 1) 10.0) p0 p1) :rot (send (send *pr2* :copy-worldcoords) :worldrot))
     ;;         base-cds-list))
     ;; (setq base-cds-list (reverse base-cds-list))
-    (setq knob-base-trans (send (send *door* :end-coords :copy-worldcoords) :transformation (send *pr2* :copy-worldcoords)))
+    (setq knob-base-trans (send (make-coords :pos (send (send *door* :end-coords :copy-worldcoords) :worldpos)) :transformation (send *pr2* :copy-worldcoords)))
     (send (send *door* :end-coords) :assoc tgt-cds)
 
     ;;calcuate base way-point
@@ -65,14 +65,14 @@
       (dotimes (i 10) ;; angle of door = i * 10
         (send *door* :hinge :joint-angle (- (* (+ i 1) d)))
         (setq knob-pos-cds (send (make-coords :pos (send *door* :end-coords :worldpos) :rot (send base-tgt :worldrot)) :copy-worldcoords))
-        (dotimes (j 10)
+        (dotimes (j 3)
           (setq base-tgt (make-coords
                          :pos (float-vector
                                (elt (send (send (send knob-pos-cds :copy-worldcoords) :transform knob-base-trans) :pos) 0)
                                (elt (send (send (send knob-pos-cds :copy-worldcoords) :transform knob-base-trans) :pos) 1)
                                0.0)
                          :rot (send knob-pos-cds :copy-rot)))
-          
+
           (when (= i 1) (send *door* :knob :joint-angle -20))
           (when (= i 2) (send *door* :knob :joint-angle 0))
           (send *pr2* :move-to base-tgt :world)
@@ -85,7 +85,11 @@
                      (push (send base-tgt :copy-worldcoords) base-cds-list)
                      (send *irtviewer* :draw-objects :flush t)
                      (return)))
-          (send knob-pos-cds :rotate (deg2rad -10) :z :world)))
+          (send knob-pos-cds :rotate (deg2rad -10) :z :world)
+          (send *irtviewer* :draw-objects :flush t))
+        (unless res
+          (return-from open-door)))
+
       (send *pr2* :angle-vector av-now)
       (send *pr2* :move-to base-now :world)
 
