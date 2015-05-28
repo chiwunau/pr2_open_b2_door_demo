@@ -37,7 +37,8 @@
                   :use-torso 0.0)
             avs))
     (send *irtviewer* :draw-objects :flush t)
-    (send *ri* :angle-vector-sequence (reverse avs) (list 1000))))
+    (send *ri* :angle-vector-sequence (reverse avs) (list 1000))
+    (send *ri* :wait-interpolation)
 
 (defun open-door ()
   (let* ((tgt-cds (make-cascoords :coords (send *pr2* :larm :end-coords :copy-worldcoords)))
