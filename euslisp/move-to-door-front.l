@@ -6,9 +6,9 @@
 
 (defun look-around-for-checkerboard ()
   (send (check-detection :type "door_checkerboard"
-                                   :speak-name "door"
+                                   :speak-name "ドア"
                                    :timeout 5
-                                   :speak nil) :copy-worldcoords))
+                                   :speak t) :copy-worldcoords))
 
 (defun move-to-door-grasp-knob ()
   (let (ckb-cds
@@ -25,7 +25,19 @@
     ;;               :tilt-enable nil)
 
     ;;adjust base location
-    (setq ckb-cds (look-around-for-checkerboard))
+    (dotimes (i 3)
+      (ckb-cds (look-around-for-checkerboard))
+      (if (or ckb-cds (= i 2))
+	  (return)
+	(progn (send *pr2* :head :neck-p :joint-angle 0)
+	       (send *pr2* :head :neck-y :joint-angle (if (= i 0) 45 -45))
+	       (send *ri* :angle-vector (send *ri* :angle-vector) 2000)
+	       (send *ri* :wait-interpolation))))
+    (unless ckb-cds
+      (speak-jp "困りました")
+      (return-from move-to-door-grasp-knob))
+	  
+	
     (objects ckb-cds)
     (setq base-target-cds (send ckb-cds :copy-worldcoords))
     (send base-target-cds :rotate (deg2rad 90) :x)
