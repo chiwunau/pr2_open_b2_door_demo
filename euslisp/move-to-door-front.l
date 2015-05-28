@@ -43,8 +43,9 @@
     ;;grasp knob prepare pose
     (let ((diff-cds (send (send *pr2* :copy-worldcoords) :transformation base-target-cds)))
       (send *pr2* :move-to base-target-cds :world)
-      (send *pr2* :larm :inverse-kinematics (send (send knob-cds :copy-worldcoords) :translate #f(-80 0 0)))
-      (send *ri* :angle-vector (send *pr2* :angle-vector) 5000)
+      (send *pr2* :larm :inverse-kinematics (send (send knob-cds :copy-worldcoords) :translate #f(-80 0 0)) :look-at-target t)
+      (send *pr2* :move-to (make-coords) :world)
+      (send *ri* :angle-vector (send *pr2* :angle-vector) 4000)
       (send *ri* :go-pos-unsafe
             (/ (elt (send diff-cds :pos) 0) 1000)
             (/ (elt (send diff-cds :pos) 1) 1000)
@@ -61,7 +62,7 @@
     (send *irtviewer* :draw-objects :flush t)
     (send *ri* :wait-interpolation)
     ;;(unix::usleep  (* 1000 1000)) ;;ensure gripper open
-    (send *pr2* :larm :inverse-kinematics (send (send knob-cds :copy-worldcoords) :translate #f(35 0 0)) :use-torso 0.0)
+    (send *pr2* :larm :inverse-kinematics (send (send knob-cds :copy-worldcoords) :translate #f(35 0 0)) :use-torso 0.0 :look-at-target t)
     (send *ri* :angle-vector (send *pr2* :angle-vector) 1000)
     (send *ri* :wait-interpolation)
     (send *ri* :start-grasp :larm)
