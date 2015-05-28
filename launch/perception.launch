@@ -1,10 +1,10 @@
 <launch>
   <group ns="door_detect" clear_params="true">
-      <param name="display" type="int" value="1"/>
-      <param name="rect0_size_x" type="double" value="0.035"/>
-      <param name="rect0_size_y" type="double" value="0.035"/>
+      <param name="display" type="int" value="0"/>
+      <param name="rect0_size_x" type="double" value="0.023"/>
+      <param name="rect0_size_y" type="double" value="0.023"/>
       <param name="grid0_size_x" type="int" value="4"/>
-      <param name="grid0_size_y" type="int" value="6"/>
+      <param name="grid0_size_y" type="int" value="5"/>
       <param name="board_type" value="chess"/>
       <param name="type0" value="door_checkerboard" />
     <node pkg="checkerboard_detector" type="checkerboard_detector" 
