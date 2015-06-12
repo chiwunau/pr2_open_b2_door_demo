@@ -86,7 +86,7 @@
                      (push (send base-tgt :copy-worldcoords) base-cds-list)
                      (send *irtviewer* :draw-objects :flush t)
                      (return)))
-          (send knob-pos-cds :rotate (deg2rad -10) :z :world)
+          (send knob-pos-cds :rotate (deg2rad -5.0) :z :world)
           (send *irtviewer* :draw-objects :flush t))
         (unless res
           (return-from open-door)))

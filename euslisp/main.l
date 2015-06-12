@@ -8,4 +8,5 @@
   (move-to-door-grasp-knob)
   (init-door-model)
   (rotate-knob)
-  (open-door))
+  (open-door)
+  (speak-jp "さよなら、またね"))
