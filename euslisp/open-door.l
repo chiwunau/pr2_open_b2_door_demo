@@ -1,4 +1,4 @@
-(load "package://drc_tasks/euslisp/make-door.l")
+(load "make-door.l")
 (defvar *door-radius* 730)
 (defvar *knob-radius* 65)
 (defvar *prepare-pose* #f(50.1274 -4.84164 18.1891 40.9723 -74.983 199.074 -81.4121 229.895 -21.8931 47.338 14.0862 -121.542 732.86 -114.592 342.337 -0.363463 40.0))
