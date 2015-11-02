@@ -1,5 +1,5 @@
 (load "package://pr2eus/pr2-interface.l")
-(load "open-door")
+(load "open-door.l")
 (load "move-to-door-front.l")
 
 (pr2-init)
