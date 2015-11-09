@@ -17,7 +17,7 @@
   (setq *door-rotate* (room73b2-door-right))
   (send *door-fix* :translate #f(1000 405.0 0))
   (send *door-rotate* :translate #f(1000 -405.0 0))
-  ;;(send (send *door-rotate* :handle-front-knob) :translate #f(-175 0 0) :world)
+  (send (send *door-rotate* :handle-front-knob) :translate #f(-175 0 0) :world)
   ;;init knob-cds
   (setq *knob-cds* (make-cascoords :coords (send *door-rotate* :handle-front-knob :copy-worldcoords)))
   (send *knob-cds* :rotate (deg2rad 180) :z)
@@ -40,7 +40,7 @@
           :move-target (send *pr2* *use-arm* :end-coords)
           :link-list (send *pr2* :link-list (send *pr2* *use-arm* :end-coords :parent))
           :use-torso 1.0
-          :use-base t)
+          :use-base nil)
 
     ;;(send *ri* :angle-vector (send *pr2* :angle-vector 4000))
     ;;(send *ri* :stop-grasp :larm)
@@ -114,7 +114,6 @@
 
     (send *knob-cds* :assoc tgt-cds)
     
-    
       (dotimes (i 10)
         (send *door-rotate* :door :joint-angle (* i 10))
           (send *pr2* :inverse-kinematics tgt-cds
@@ -126,7 +125,7 @@
                     :rotation-axis t
                     :use-torso t
                     :use-base t
-                    :base-range (list :min #f(-150 0 0) :max #f(300 0 0))
+                    :base-range (list :min #f(-150 0 -100) :max #f(300 0 100))
                     :debug-view :no-message
                     :additional-check #'(lambda () (not (door-base-collide))))
           (push (send *pr2* :copy-worldcoords) base-cds-list)
