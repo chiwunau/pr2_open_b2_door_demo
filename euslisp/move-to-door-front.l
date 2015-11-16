@@ -97,7 +97,7 @@
     (send *irtviewer* :draw-objects :flush t)
     (send *ri* :wait-interpolation)
     ;;(unix::usleep  (* 1000 1000)) ;;ensure gripper open
-    (send *pr2* :larm :inverse-kinematics (send (send knob-cds :copy-worldcoords) :translate #f(65 0 0)) :use-torso 0.0 :look-at-target t)
+    (send *pr2* :larm :inverse-kinematics (send (send knob-cds :copy-worldcoords) :translate #f(40 0 0)) :use-torso 0.0 :look-at-target t)
     (send *ri* :angle-vector (send *pr2* :angle-vector) 2000)
     (send *ri* :wait-interpolation)
     (send *ri* :start-grasp :larm)
