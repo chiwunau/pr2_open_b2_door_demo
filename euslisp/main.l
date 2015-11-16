@@ -9,4 +9,7 @@
   (init-door-model)
   (rotate-knob)
   (open-door)
-  (speak-jp "さよなら、またね"))
+  ;;;finished opening door
+  (send *ri* :move-to (send (send (send *scene* :spot "/eng2/7f/room73B2-door-front") :copy-worldcoords) :translate #f(-1000 200 0)))
+  ;(speak-jp "さよなら、またね")
+  )

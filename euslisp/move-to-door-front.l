@@ -5,10 +5,12 @@
 (defparameter *detection-topic* "/door_detect/ObjectDetection")
 
 (defun look-around-for-checkerboard ()
-  (send (check-detection :type "door_checkerboard"
+  (let ((res (check-detection :type "door_checkerboard"
                                    :speak-name "ドア"
-                                   :timeout 5
-                                   :speak t) :copy-worldcoords))
+                                   :timeout 10
+                                   :speak nil)))
+    (when res
+	(send res :copy-worldcoords))))
 
 (defun move-to-door-grasp-knob ()
   (let (ckb-cds
@@ -31,11 +33,12 @@
 	  (return)
 	(progn (send *pr2* :head :neck-p :joint-angle 0)
 	       (send *pr2* :head :neck-y :joint-angle (if (= i 0) 45 -45))
-	       (send *ri* :angle-vector (send *ri* :angle-vector) 2000)
+	       (send *ri* :angle-vector (send *pr2* :angle-vector) 1000)
 	       (send *ri* :wait-interpolation))))
     (unless ckb-cds
-      (speak-jp "困りました")
+      (print "困りました")
       (return-from move-to-door-grasp-knob))
+    (print "found checkerboard for adjust baes pose!")
 	  
 	
     (objects ckb-cds)
@@ -48,40 +51,59 @@
     (setq knob-cds (send ckb-cds :copy-worldcoords))
     (send knob-cds :rotate (deg2rad 90) :x)
     (send knob-cds :rotate (deg2rad 90) :z)
-    (send knob-cds :translate #f(-55 -25 -400))
+    (send knob-cds :translate #f(-55 0 -400))
     (send knob-cds :rotate (deg2rad -90) :x)
     (objects base-target-cds)
     (objects knob-cds)
     ;;grasp knob prepare pose
     (let ((diff-cds (send (send *pr2* :copy-worldcoords) :transformation base-target-cds)))
       (send *pr2* :move-to base-target-cds :world)
-      (send *pr2* :larm :inverse-kinematics (send (send knob-cds :copy-worldcoords) :translate #f(-80 0 0)) :look-at-target t)
+      (send *pr2* :inverse-kinematics (send (send knob-cds :copy-worldcoords) :translate #f(-80 0 0))
+	    :move-target (send *pr2* :larm :end-coords)
+	    :link-list (send *pr2* :link-list (send *pr2* :larm :end-coords :parent))
+	    :use-torso 0.001
+	    )
       (send *pr2* :move-to (make-coords) :world)
       (send *ri* :angle-vector (send *pr2* :angle-vector) 4000)
       (send *ri* :go-pos-unsafe
             (/ (elt (send diff-cds :pos) 0) 1000)
             (/ (elt (send diff-cds :pos) 1) 1000)
             (rad2deg (vector-angle #f(1 0 0) (matrix-column (send diff-cds :rot) 0) #f(0 0 1)))))
+    (send *ri* :wait-interpolation)
+    (send *pr2* :head :neck-p :joint-angle 0)
+    (send *ri* :angle-vector (send *pr2* :angle-vector) 500)
 
-    ;;setq knob coordinates
+    ;;confirm knob coordinates
     (send *ri* :stop-grasp :larm)
-    (send ckb-cds :move-to (look-around-for-checkerboard) :world)
-    (send knob-cds :move-to (send ckb-cds :copy-worldcoords) :world)
-    (send knob-cds :rotate (deg2rad 90) :x)
-    (send knob-cds :rotate (deg2rad 90) :z)
-    (send knob-cds :translate #f(-55 -25 -400))
-    (send knob-cds :rotate (deg2rad -90) :x)
+
+    (dotimes (i 3)
+      (setq ckb-cds (look-around-for-checkerboard))
+      (if (or ckb-cds (= i 2))
+	  (return)
+	(progn (send *pr2* :head :neck-p :joint-angle (if (= i 0) 10 20))
+	       (send *pr2* :head :neck-y :joint-angle 0)
+	       (send *ri* :angle-vector (send *pr2* :angle-vector) 500)
+	       (send *ri* :wait-interpolation))))
+
+      (if ckb-cds
+	  (progn
+	  ;;(send ckb-cds :move-to res :world)
+	  (send knob-cds :move-to (send ckb-cds :copy-worldcoords) :world)
+	  (send knob-cds :rotate (deg2rad 90) :x)
+	  (send knob-cds :rotate (deg2rad 90) :z)
+	  (send knob-cds :translate #f(-55 0 -400))
+	  (send knob-cds :rotate (deg2rad -90) :x))
+	(print "cannot locate checkerboard"))
     (send *irtviewer* :draw-objects :flush t)
     (send *ri* :wait-interpolation)
     ;;(unix::usleep  (* 1000 1000)) ;;ensure gripper open
     (send *pr2* :larm :inverse-kinematics (send (send knob-cds :copy-worldcoords) :translate #f(65 0 0)) :use-torso 0.0 :look-at-target t)
-    (send *ri* :angle-vector (send *pr2* :angle-vector) 1000)
+    (send *ri* :angle-vector (send *pr2* :angle-vector) 2000)
     (send *ri* :wait-interpolation)
     (send *ri* :start-grasp :larm)
-
-
+    (unix::usleep (* 1000 1500))
     ;; (send base-target-cds :transate)
-)
+    ))
 
 
          

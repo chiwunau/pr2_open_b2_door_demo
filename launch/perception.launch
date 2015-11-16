@@ -9,8 +9,8 @@
       <param name="type0" value="door_checkerboard" />
     <node pkg="checkerboard_detector" type="checkerboard_detector" 
           name="checkerboard_detector" output="screen">
-      <remap from="camera_info" to="/openni_c2/rgb/camera_info"/>
-      <remap from="image" to="/openni_c2/rgb/image_rect_mono"/>
+      <remap from="camera_info" to="/kinect_head_c2/rgb/camera_info"/>
+      <remap from="image" to="/kinect_head_c2/rgb/image_rect_mono"/>
     </node>
 
     <node pkg="checkerboard_detector" type="objectdetection_tf_publisher.py" 
