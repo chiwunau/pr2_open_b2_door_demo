@@ -95,6 +95,19 @@
       (send *pr2* :move-to base-now :world)
 
     (execute-door-motion (reverse avs) (reverse base-cds-list))
+
+    ;;finished open-door tuckarm
+    (send *ri* :wait-interpolation)
+    (send *ri* :stop-grasp :larm)
+    (send *pr2* :larm :inverse-kinematics 
+	  (send (send *pr2* :larm :end-coords :copy-worldcoords) :translate #f(-100 0 0)))
+    (unix::usleep (* 1000 1000))
+    (send *ri* :angle-vector (send *pr2* :angle-vector) 1000)
+    (send *ri* :wait-interpolation)
+    (send *pr2* :larm :angle-vector (car *pr2-tuckarm-pose-larm-free*))
+    (send *pr2* :torso :waist-z :joint-angle 11.5)
+    (send *ri* :angle-vector (send *pr2* :angle-vector) 2000)
+    (send *ri* :wait-interpolation)
     )))
 
 (defun execute-door-motion (avs base-cds-list)
