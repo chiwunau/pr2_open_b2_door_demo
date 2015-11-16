@@ -19,7 +19,7 @@
   (setq *door-rotate* (room73b2-door-right))
   (send *door-fix* :translate #f(1000 405.0 0))
   (send *door-rotate* :translate #f(1000 -405.0 0))
-  (send (send *door-rotate* :handle-front-knob) :translate #f(-175 0 0) :world)
+;;  (send (send *door-rotate* :handle-front-knob) :translate #f(-175 0 0) :world)
   ;;init knob-cds
   (setq *knob-cds* (make-cascoords :coords (send *door-rotate* :handle-front-knob :copy-worldcoords)))
   (send *knob-cds* :rotate (deg2rad 180) :z)
@@ -36,7 +36,7 @@
   )
 
 (defun grasp-knob
-  (&optional (knob-cds *knob-cds*))
+  (&optional (knob-cds *knob-cds*) &key (real-robot t))
   (let ((pre-cds (send (send knob-cds :copy-worldcoords) :translate #f(-80 0 0))))
     (send *pr2* :inverse-kinematics (send (send *knob-cds* :copy-worldcoords) :translate #f(-80 0 0))
           :move-target (send *pr2* *use-arm* :end-coords)
@@ -44,22 +44,25 @@
           :use-torso 0.01
           :use-base t
           :base-range (list :min #f(-150 0 0) :max #f(100 0 0)))
-          
 
-    (send *ri* :angle-vector (send *pr2* :angle-vector) 4000)
-    (send *ri* :stop-grasp :larm)
-    
+    (when real-robot
+      (send *ri* :angle-vector (send *pr2* :angle-vector) 4000)
+      (send *ri* :wait-interpolation)
+      (send *ri* :stop-grasp *use-arm*))
+
     (send *pr2* :inverse-kinematics knob-cds
           :move-target (send *pr2* *use-arm* :end-coords)
           :link-list (send *pr2* :link-list (send *pr2* *use-arm* :end-coords :parent))
           :use-torso 0.0)
-
-    (send *ri* :angle-vector (send *pr2* :angle-vector) 4000)
+    (when real-robot
+      (send *ri* :angle-vector (send *pr2* :angle-vector) 4000)
+      (send *ri* :wait-interpolation)
+      (send *ri* :stop-grasp *use-arm*))
     ))
 
 
 
-(defun rotate-knob 
+(defun rotate-knob
   (&optional (knob-cds *knob-cds*) &key (real-robot t))
   (when real-robot
     (send *pr2* :angle-vector (send *ri* :potentio-vector)))
@@ -85,15 +88,24 @@
    (pqp-collision-check-objects (list (car (send *pr2* :torso :parent-link))) (append (send *door-fix* :links) (send *door-rotate* :links)))
   )
 
+(defun door-arm-collide
+  ()
+  (pqp-collision-check-objects (send *pr2* *use-arm* :links) (append (send *door-fix* :links) (send *door-rotate* :links)))
+  )
+
 
 
 (defun door-arm-collision-link-pair ()
   (let ((ls1 (send *pr2* *use-arm* :links))
         (ls2 (send *door-fix* :links))
+        (ls3 (send *door-rotate* :links))
         res)
     (dolist (l1 ls1)
       (dolist (l2 ls2)
-        (push (list l1 l2) res)))
+        (push (list l1 l2) res))
+      (when (eq *use-arm* :rarm)
+        (dolist (l3 ls3)
+          (push (list l1 l3) res))))
     res))
 
 (defun door-base-collision-link-pair ()
@@ -109,7 +121,7 @@
     
 
 
-(defun generate-motion 
+(defun generate-motion
   (&key (real-robot t))
   (when real-robot
     (send *pr2* :angle-vector (send *ri* :potentio-vector)))
@@ -128,8 +140,8 @@
     (setq base-cds-list nil) ;;debug
     (send *knob-cds* :assoc tgt-cds)
     
-    (dotimes (i 10)
-      (send *door-rotate* :door :joint-angle (* i 10))
+    (dotimes (i 20)
+      (send *door-rotate* :door :joint-angle (* i 5))
       (when (= i 2) (send *door-rotate* :knob :joint-angle 20))
       (when (= i 3) (send *door-rotate* :knob :joint-angle 0))
       (setq rotated-angle (vector-angle (matrix-column (send st-base-cds :worldrot) 0) (matrix-column (send *pr2* :copy-rot) 0) #f(0 0 1)))
@@ -143,15 +155,15 @@
             :move-target (send *pr2* *use-arm* :end-coords)
             :link-list (send *pr2* :link-list (send *pr2* *use-arm* :end-coords :parent))
             :collision-avoidance-link-pair (door-arm-collision-link-pair)
-            :avoid-collision-distance 200
+            :avoid-collision-distance 250
             :avoid-collision-joint-gain 1.0
-            :avoid-collision-null-gain 80.0
+            :avoid-collision-null-gain 100.0
             :rotation-axis :z
             :use-torso t
             :use-base t
-            :base-range (list :min (float-vector -150 0 -30) 
+            :base-range (list :min (float-vector -150 0 -30)
                               :max (float-vector 300 0  30))
-            :debug-view nil
+            :debug-view :no-message
             :additional-check #'(lambda () (not (door-base-collide))))
       (push (send *pr2* :copy-worldcoords) base-cds-list)
       (push (send *pr2* :angle-vector) avs)
@@ -185,7 +197,7 @@
     (setq *base-cds-list* base-cds-list)
     (setq *avs* avs)
     (send *ri* :angle-vector-sequence avs (list t-interval) :default-controller sttm)
-    (send *ri* :move-trajectory-sequence 
+    (send *ri* :move-trajectory-sequence
           (reverse traj-points)
           (make-list (length base-cds-list) :initial-element t-interval)
           :start-time sttm
@@ -198,18 +210,20 @@
       (send *pr2* :rarm :angle-vector (cadr *pr2-tuckarm-pose-larm-free-outside*))
     (send *pr2* :larm :angle-vector (car *pr2-tuckarm-pose-rarm-free-outside*)))
   (adjust-pose-to-grasp-knob)
-  (grasp-knob)
+  (grasp-knob *knob-cds* :real-robot nil)
   (rotate-knob *knob-cds* :real-robot nil)
-  (generate-motion :real-robot nil))
+  (let ((motion (generate-motion :real-robot nil)))
+    (play-motion (car motion) (cadr motion))))
+
 
 (defun play-motion (avs base-cds-list)
   (let ((recent-av (send *pr2* :angle-vector))
         (recent-cds (send *pr2* :copy-worldcoords)))
   (dotimes (i (length avs))
-    (print (door-base-collide))
-    (send *door-rotate* :door :joint-angle (* i 10))
+    (format t "door-base-collide:~A door-arm-collide:~A~%" (door-base-collide) (door-arm-collide))
+    (send *door-rotate* :door :joint-angle (* i 5))
     (send *pr2* :move-to (elt base-cds-list i) :world)
-    (unix::usleep (* 1000 500))
+    (unix::usleep (* 1000 100))
     (send *pr2* :angle-vector (elt avs i))
     (send *irtviewer* :draw-objects :flush t))
   (send *pr2* :angle-vector recent-av)
