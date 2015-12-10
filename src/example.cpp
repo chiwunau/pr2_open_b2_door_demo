@@ -1,27 +1,34 @@
 #include <ros/ros.h>
 // PCL specific includes
 #include <sensor_msgs/PointCloud2.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
+#include <geometry_msgs/Point.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/filters/extract_indices.h>
+#include <pcl/filters/project_inliers.h>
 #include <pcl/kdtree/kdtree.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <time.h>
 
 // #include <pcl/filters/voxel_grid.h>
 
 ros::Publisher pub;
+ros::Publisher marker_arr_pub;
 ros::Publisher pub_inliers_;
 ros::Publisher pub_coefficients_;
 boost::mutex mutex_;
-float ransac_dist_thres_ = 0.05; //5cm
-int ransac_min_inliers_ = 40;
-int ransac_min_trial_ = 5;
-int ransac_model_min_points_ = 15;
-float cluster_tolerance_ = 0.15; //15cm
-int cluster_min_size_ = 60;
+float ransac_dist_thres_ = 0.01; //5cm
+int ransac_min_inliers_ = 50;
+int ransac_min_trial_ = 3;
+int ransac_model_min_points_ = 30; // 2* ransac_min_inliers__
+float cluster_tolerance_ = 0.15; //30cm
+int cluster_min_size_ = 30;
+int base_scan_total_size = 1040;
 
   void applyRecursiveRANSAC(const pcl::PointCloud<pcl::PointXYZ>::Ptr& input, std::vector<pcl::PointIndices::Ptr>& output_inliers, std::vector<pcl::ModelCoefficients::Ptr>& output_coefficients){
     pcl::PointCloud<pcl::PointXYZ>::Ptr rest_cloud (new pcl::PointCloud<pcl::PointXYZ>);
@@ -40,26 +47,28 @@ int cluster_min_size_ = 60;
       seg.setInputCloud (rest_cloud);
       seg.segment (*inliers, *coefficients);
 
+      //prepare for next loop
+      pcl::PointCloud<pcl::PointXYZ>::Ptr next_rest_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+
       if (inliers->indices.size() >= ransac_min_inliers_) {
         output_inliers.push_back(inliers);
         output_coefficients.push_back(coefficients);
+        pcl::ExtractIndices<pcl::PointXYZ> ex;
+        ex.setInputCloud (rest_cloud);
+        ex.setIndices (inliers);
+        ex.setNegative (true);
+        ex.setKeepOrganized(true);
+        ex.filter(*next_rest_cloud);
       }
       else{
+                next_rest_cloud = rest_cloud;
         if (ransac_min_trial_ <= counter) {
           return;
         }
-      }                                         
+        
+      } 
+ 
 
-    //prepare for next loop
-    pcl::PointCloud<pcl::PointXYZ>::Ptr next_rest_cloud (new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::ExtractIndices<pcl::PointXYZ> ex;
-    ex.setInputCloud (rest_cloud);
-    ex.setIndices (inliers);
-    ex.setNegative (true);
-    ex.setKeepOrganized(true);
-    ex.filter(*next_rest_cloud);
-
-    std::cout<<"left cloud size:"<<next_rest_cloud->points.size()<<std::endl;
     if (next_rest_cloud->points.size() < ransac_model_min_points_) {
       return;
     }
@@ -67,12 +76,71 @@ int cluster_min_size_ = 60;
     }
 }
 
-// Eigen::Vector3d* culculate_inliner_polars(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, pcl::PointIndices::Ptr inliners, pcl::ModelCoefficients::Ptr coefficients)
-// {
-// Eigen::Vector3d* res (new Eigen::Vector3d[2]);
+  Eigen::Vector3d* calculate_inliner_polars(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,const pcl::PointIndices::Ptr& inliers,const pcl::ModelCoefficients::Ptr& coefficients)
+{
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_relay (new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::ExtractIndices<pcl::PointXYZ> ex;
+  ex.setInputCloud (cloud);
+  ex.setIndices (inliers);
+  ex.setNegative (false);
+  ex.setKeepOrganized(true);
+  ex.filter(*cloud_relay);
 
-//   return res;
-// }
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_projected (new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::ProjectInliers<pcl::PointXYZ> proj;
+  proj.setModelType (pcl::SACMODEL_LINE);
+  proj.setInputCloud (cloud_relay);
+  proj.setModelCoefficients (coefficients);
+  proj.filter (*cloud_projected);
+
+  Eigen::Vector3d* res (new Eigen::Vector3d[2]);
+  size_t indices_size = inliers->indices.size();
+  res[0] = Eigen::Vector3d (cloud_projected->points[inliers->indices[0]].x, cloud_projected->points[inliers->indices[0]].y, cloud_projected->points[inliers->indices[0]].z);
+  res[1] = Eigen::Vector3d (cloud_projected->points[inliers->indices[indices_size - 1]].x, cloud_projected->points[inliers->indices[indices_size -1]].y, cloud_projected->points[inliers->indices[indices_size - 1]].z);
+
+  return res;
+}
+
+visualization_msgs::Marker::Ptr make_line_marker(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, const pcl::PointIndices::Ptr& inliers, const pcl::ModelCoefficients::Ptr& coefficients,int count){
+
+  Eigen::Vector3d* polars= calculate_inliner_polars(cloud, inliers, coefficients);
+  geometry_msgs::Point p0;
+  geometry_msgs::Point p1;
+  p0.x = polars[0](0); p0.y = polars[0](1); p0.z = polars[0](2);
+  p1.x = polars[1](0); p1.y = polars[1](1); p1.z = polars[1](2);
+
+  visualization_msgs::Marker::Ptr marker (new visualization_msgs::Marker);
+  marker->header = pcl_conversions::fromPCL(cloud->header);
+  marker->ns = "line_segment";
+  marker->id = count;
+  marker->type = visualization_msgs::Marker::LINE_LIST;
+
+  marker->points.push_back(p0);
+  marker->points.push_back(p1);
+  marker->scale.x = 0.05;
+  float red = ((float) rand() / (RAND_MAX));
+  float green =  ((float) rand() / (RAND_MAX));
+  float blue =  ((float) rand() / (RAND_MAX));
+
+  marker->color.a = 1.0;
+  marker->color.r = red;
+  marker->color.g = green;
+  marker->color.b = blue;
+
+  return marker;
+}
+
+  
+  
+
+
+
+
+
+  // Eigen::Vector3d* res (new Eigen::Vector3d[2]);
+  // Eigen::Vector3d point_on_line (*coefficients[0], *coefficients[1], *coefficients[2]);
+  
   
 
 
@@ -93,7 +161,8 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 
   // Convert to PCL data type
   pcl::fromROSMsg(*cloud_msg, *cloud);
-
+  
+  std::cout<<cloud->points.size()<<std::endl;
   //Extract cloud clusters
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
   tree->setInputCloud (cloud);
@@ -112,9 +181,7 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
   ex.setNegative(false);
 
   //For every cluster calculate line segment
-  std::cout<<"number of cluster:"<<cluster_indices.size()<<std::endl;
   for (size_t i = 0; i < cluster_indices.size(); i++){
-    std::cout<<i<<std::endl;
     pcl::PointIndices::Ptr indices (new pcl::PointIndices ());
     *indices = cluster_indices[i];
     pcl::PointCloud<pcl::PointXYZ>::Ptr cluster_cloud (new pcl::PointCloud<pcl::PointXYZ>);
@@ -145,7 +212,6 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     uint red = rand() % 256;
     uint green = rand() % 256;
     uint blue = rand() % 256;
-    std::cout<<"r:"<<red<<" g:"<<green<<" b:"<<blue<<std::endl;
     
     for(size_t j = 0; j < all_inliers[i]->indices.size(); j++){
       colored_cloud->points[all_inliers[i]->indices[j]].r = red;
@@ -154,60 +220,24 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     }
   }
 
+  //make line marker message
+  visualization_msgs::MarkerArray marker_array;
+  for(size_t i = 0; i < all_inliers.size(); i++)
+    {
+      visualization_msgs::Marker::Ptr marker;
+      marker = make_line_marker(cloud, all_inliers[i], all_coefficients[i], i);
+      marker_array.markers.push_back(*marker);
+    }
 
-  // pcl::PointCloud<pcl::PointXYZRGB>::Ptr output_cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
-  // *output_cloud = *colored_cloud;
-
-  sensor_msgs::PointCloud2 output;
-  pcl::toROSMsg(*colored_cloud, output);
-  //  pcl_conversions::moveFromPCL(cloud_filtered, output);
+      sensor_msgs::PointCloud2 output;
+      pcl::toROSMsg(*colored_cloud, output);
 
   // Publish the data
-  pub.publish (output);
+      pub.publish (output);
+      marker_arr_pub.publish (marker_array);
 }
 
     
-    // std::vector<pcl::ModelCoefficients::Ptr> coefficients;
-    // std::vector<pcl::PointIndices::Ptr> inliers;
-    
-    // pcl::SACSegmentation<pcl::PointXYZ> seg;
-    // seg.setOptimizeCoefficients (true);
-    // seg.setModelType (pcl::SACMODEL_LINE);
-    // seg.setMethodType (pcl::SAC_RANSAC);
-    // seg.setDistanceThreshold (0.005);
-    // seg.setInputCloud (cloud->makeShared ());
-    // seg.segment (*inliers, *coefficients);
-    
-    // pcl::ExtractIndices<pcl::PointXYZ> extract;
-    // extract.setInputCloud (cloud);
-    // extract.setIndices (inliers);
-    // extract.setNegative (false);
-    // extract.filter(*cloud_p);
-
-
-  // ros_indices_output.header = cloud_msg->header;
-  // ros_coefficients_output = cloud_msg->header;
-  
-  // ros_indices_output.cluster_indices = pcl_conversions::convertToROSPointIndices(inliners, cloud_msg->header);
-  // ros_coefficients_output.coefficients = pcl_conversions::convertToROSModelCoefficients(coefficients, cloud_msg->header);
-  // pub_inliers_.publish(ros_indices_output);
-  // pub_coefficients_.publish(ros_coefficients_output);
-
-  // perform the actual filtering
-  // pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
-  // sor.setInputCloud (cloudPtr);
-  // sor.setLeafSize (0.1, 0.1, 0.1);
-  // sor.filter (cloud_filtered);
-
-  //  sensor_msgs::PointCloud2 output;
-  //pcl::toROSMsg(*cloud_p, output);
-  // pcl_conversions::moveFromPCL(cloud_filtered, output);
-
-  // // Publish the data
-  //  pub.publish (output);
-
-
-
 int
 main (int argc, char** argv)
 {
@@ -222,6 +252,7 @@ main (int argc, char** argv)
 
   // Create a ROS publisher for the output point cloud
   pub = nh.advertise<sensor_msgs::PointCloud2> ("output", 1);
+  marker_arr_pub = nh.advertise<visualization_msgs::MarkerArray> ("markers_output", 1);
   // pub_inliers_ = nh.advertise<jsk_recognition_msgs::ClusterPointIndices>("/line_segmentation/output_indices", 1);
   // pub_coefficients_ = nh.advertise<jsk_recognition_msgs::ModelCoefficientsArray>("/line_segmentation/output_coefficnets", 1);
 
