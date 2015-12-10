@@ -48,7 +48,7 @@ int cluster_min_size_ = 60;
         if (ransac_min_trial_ <= counter) {
           return;
         }
-      }\
+      }                                         
 
     //prepare for next loop
     pcl::PointCloud<pcl::PointXYZ>::Ptr next_rest_cloud (new pcl::PointCloud<pcl::PointXYZ>);
