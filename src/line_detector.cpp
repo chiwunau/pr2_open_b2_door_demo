@@ -257,7 +257,7 @@ main (int argc, char** argv)
   // pub_coefficients_ = nh.advertise<jsk_recognition_msgs::ModelCoefficientsArray>("/line_segmentation/output_coefficnets", 1);
 
   // Spin
-  ros::Rate loop_rate(5);
+  ros::Rate loop_rate(10);
   while(ros::ok()){
     ros::spinOnce ();
     loop_rate.sleep();
