@@ -19,4 +19,4 @@ catkin_package()
 include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_executable(line_detector src/line_detector.cpp)
-target_link_libraries(example ${catkin_LIBRARIES})
+target_link_libraries(line_detector ${catkin_LIBRARIES})
