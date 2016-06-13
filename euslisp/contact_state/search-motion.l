@@ -152,12 +152,12 @@
 
 
 
-(defun play-motion
+ (defun play-motion
   ()
   (let ((motion-list-seq (reverse *sampled-motion-sequence*))
         (base-cds-list-seq (reverse *sampled-base-cds-sequence*))
         (torque-list-seq (reverse *sampled-torque-sequence*)))
-    (dotimes (i (length motion-list-seq))
+    (dotimes (i 1);(length motion-list-seq))
       (dotimes (j (length (elt motion-list-seq i)))
         (send *door* :hinge :joint-angle (* (+ j 1) -20))
         (dotimes (k (length (elt (elt motion-list-seq i) j)))
@@ -165,11 +165,24 @@
             (send *pr2* :angle-vector (elt (elt (elt motion-list-seq i) j) k))
             (send *pr2* :move-to (elt (elt (elt base-cds-list-seq i) j) k) :world)
             (send *irtviewer* :draw-objects)
-            (send *pr2* :draw-torque (send *irtviewer* :viewer) :torque-vector (scale 10 (elt (elt (elt torque-list-seq i) j) k)))
-            (send *irtviewer* :viewer :viewsurface :flush)
+            ;; (send *pr2* :draw-torque (send *irtviewer* :viewer) :torque-vector (scale 10 (elt (elt (elt torque-list-seq i) j) k)))
+            ;; (send *irtviewer* :viewer :viewsurface :flush)
             (unix::usleep (* 1000 200)))
           )))
     ))
-   
+ 
+(dolist (cds *contact-pts*)
+  (send cds :draw-on :flush t :size 100 :color #f(1 0 0)))
+
+(defun get-all-links (l)
+  (let ((r (list l)))
+    (dolist (d (send l :descendants))
+      (when (derivedp d bodyset-link)
+        (setq r (append r (get-all-links d)))))
+    r))  
    
     
+;;make-door
+;;set-contact-points
+;;motion-generation-new
+;;play-motion

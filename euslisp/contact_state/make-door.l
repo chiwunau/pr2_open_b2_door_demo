@@ -43,7 +43,7 @@
 	   self))
 
   (:make-front-touch-cds-list
-   (door-width knob-height &optional (p 8) (q 8))
+   (door-width knob-height &optional (p 4) (q 4))
    (let (cds-list
          cds
          (y-step (/ (/ door-width 2) p))
@@ -60,7 +60,7 @@
      cds-list))
 
   (:make-rear-touch-cds-list
-   (door-width knob-height &optional (p 8) (q 8))
+   (door-width knob-height &optional (p 4) (q 4))
    (let (cds-list
          cds
          (y-step (/ (/ door-width 2) p))
@@ -103,4 +103,7 @@
 
 
 (defun make-door ()
-  (instance door :init 700 1000 50))
+  (setq *door* (instance door :init 700 1000 50))
+  (send *door* :translate #f(700 700 0))
+  (send *irtviewer* :objects *door*)
+  (send *irtviewer* :objects (append ( send *irtviewer* :objects) (send *door* :get-rear-touch-cds-list))))
