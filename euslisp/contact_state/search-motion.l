@@ -1,15 +1,63 @@
 (unless (boundp '*pr2*)
-  (load "package://pr2eus/pr2-interface.l")
-  (pr2))
-(setq *sampled-motion-sequence* nil)
-(setq *sampled-base-cds-sequence* nil)
-(setq *sampled-torque-sequence* nil)
+  (load "package://pr2eus/pr2-interface.l"))
+(require "make-door.l")
+
+(setq *left-samples* nil)
+(setq *rightsamples* nil)
+
+
+
+(defclass motion-samples
+  :slots (pose-seq base-seq torque-seq))
+(defmethod motion-samples
+  (:init
+   ()
+   )
+
+  (:push
+   (name data)
+   (cond ((eq name :pose-seq)
+          (push data pose-seq))
+         ((eq name :base-seq)
+          (push data base-seq))
+         ((eq name :torque-seq)
+          (push data torque-seq))))
+
+  (:get
+   (name)
+   (cond ((eq name :pose-seq)
+          pose-seq)
+         ((eq name :base-seq)
+          base-seq)
+         ((eq name :torque-seq)
+          torque-seq)))
+  )
+;; (setq *sampled-motion-sequence* nil)
+;; (setq *sampled-base-cds-sequence* nil)
+;; (setq *sampled-torque-sequence* nil)
 (unless (boundp '*use-arm*)
-  (setq *use-arm* :rarm))
+  (setq *use-arm* :larm))
 
 (setq *contact-pts* nil)
 
+(defun init()
+  (pr2)
+  (objects *pr2*)
+  (make-door)
+  (objects *door*)
+  (setq *left-samples* (instance motion-samples :init))
+  (setq *right-samples* (instance motion-samples :init)))
+
+
+(defun reset-scene ()
+  (send *pr2* :move-to (make-coords) :world)
+  (set-contact-points)
+  (setq *left-samples* (instance motion-samples :init))
+  (setq *right-samples* (instance motion-samples :init)))
+  )
+
 (defun set-contact-points ()
+  (setq *contact-pts* nil)
   (let (pt0 pt1 pt2 pt3)
     (setq pt0 (make-cascoords :coords (send *pr2* *use-arm* :end-coords :copy-worldcoords)))
     (send (send *pr2* *use-arm* :end-coords :parent) :assoc pt0)
@@ -28,14 +76,14 @@
     (setq *contact-pts* (reverse *contact-pts*))
     ))
 
-(defun motion-generation ()
-  (let ((tgt-cds-list (send *door* :get-rear-touch-cds-list))
-        motion-list
-        res)
-    (dolist (cds tgt-cds-list)
-      (setq res (send *pr2* :rarm :inverse-kinematics cds :rotation-axis nil :debug-view :no-message))
-      (push res motion-list))
-  (push motion-list *sampled-motion-sequence*)))
+;; (defun motion-generation ()
+;;   (let ((tgt-cds-list (send *door* :get-rear-touch-cds-list))
+;;         motion-list
+;;         res)
+;;     (dolist (cds tgt-cds-list)
+;;       (setq res (send *pr2* :rarm :inverse-kinematics cds :rotation-axis nil :debug-view :no-message))
+;;       (push res motion-list))
+;;   (push motion-list *sampled-motion-sequence*)))
 
 (defun motion-generation-new ()
   (let ((tgt-cds-list (reverse (send *door* :get-rear-touch-cds-list)))
@@ -47,71 +95,75 @@
         torque-list-seq
         (org-base-cds (send *pr2* :copy-worldcoords))
         res)
-    (dolist (contact-pt *contact-pts*)
-      (setq torque-list-seq nil)
-      (setq motion-list-seq nil)
-      (setq base-cds-list-seq nil)
-      (dotimes (i 5)
-        (setq torque-list nil)
-        (setq motion-list nil)
-        (setq base-cds-list nil)
-        (send *door* :hinge :joint-angle (* (+ i 1) -20))
+    (dolist (arm (list :rarm :larm))
+      (setq *use-arm* arm)
+      (set-contact-points)
+      (dolist (contact-pt *contact-pts* )
+        (setq torque-list-seq nil)
+        (setq motion-list-seq nil)
+        (setq base-cds-list-seq nil)
+        (dotimes (i 5)
+          (setq torque-list nil)
+          (setq motion-list nil)
+          (setq base-cds-list nil)
+          (send *door* :hinge :joint-angle (* (+ i 1) -20))
 
-        (dolist (cds tgt-cds-list)
-          (cond ((eq contact-pt (elt *contact-pts* 0))
-                 (setq res (send *pr2* :inverse-kinematics (send (send cds :copy-worldcoords) :translate #f(20 0 0));;cds
-                                 :move-target contact-pt ;;(send *pr2* *use-arm* :end-coords)
-                                 :link-list (send *pr2* :link-list (send contact-pt :parent)) ;;(send *pr2* *use-arm* :end-coords :parent))
-                                 :collision-avoidance-link-pair (door-arm-collision-link-pair contact-pt)
-                                 :avoid-collision-distance 100
-                                 :avoid-collision-joint-gain 1.0
-                                 :avoid-collision-null-gain 100.0
-                                 :rotation-axis nil;;:z
-                                 :use-torso t
-                                 :use-base 1.0
-                                 :base-range (list :min (float-vector -1000 -1000 -90)
-                                                   :max (float-vector 1000 1000  90))
-                                 ;; :base-range (list :min (float-vector -150 0 -30)
-                                 ;;                   :max (float-vector 300 0  30))
-                                 :debug-view nil ;;:no-message
-                                 ;;                      :additional-check #'(lambda () (not (door-base-collide)))
-                                 )
-                       )
-                 )
-                ;;-----------------FOR FOREARM AND ELBOW--------------------------
-                ((or (eq contact-pt (elt *contact-pts* 1)) (eq contact-pt (elt *contact-pts* 2)))
-                 (setq res (send *pr2* :inverse-kinematics (send (send (send cds :copy-worldcoords) :translate #f(50 0 0))  :rotate (deg2rad 90) :y);;cds
-                                 :move-target contact-pt ;;(send *pr2* *use-arm* :end-coords)
-                                 :link-list (send *pr2* :link-list (send contact-pt :parent)) ;;(send *pr2* *use-arm* :end-coords :parent))
-                                 :collision-avoidance-link-pair (door-arm-collision-link-pair contact-pt)
-                                 :avoid-collision-distance 100
-                                 :avoid-collision-joint-gain 1.0
-                                 :avoid-collision-null-gain 100.0
-                                 :rotation-axis (if (eq contact-pt (elt *contact-pts* 1)) :z nil) ;;:z for forearm nil for elbow 
-                                 :use-torso t
-                                 :use-base 1.0
-                                 :base-range (list :min (float-vector -1000 -1000 -90)
-                                                   :max (float-vector 1000 1000  90))
-                                 ;; :base-range (list :min (float-vector -150 0 -30)
-                                 ;;                   :max (float-vector 300 0  30))
-                                 :debug-view nil ;;:no-message
-                                 :additional-check #'(lambda () (not (door-base-collide))))
-                       )
-                 )
-                )
-          (push (get-hold-door-torque cds contact-pt) torque-list)
-          (push (send *pr2* :copy-worldcoords) base-cds-list)
-          (push res motion-list)
-          (send *pr2* :move-to org-base-cds :world))
-        (push torque-list torque-list-seq)
-        (push base-cds-list base-cds-list-seq)
-        (push motion-list motion-list-seq)
-        )
-      (push (reverse torque-list-seq) *sampled-torque-sequence*)
-      (push (reverse base-cds-list-seq) *sampled-base-cds-sequence*)
-      (push (reverse motion-list-seq) *sampled-motion-sequence*)
-      )
-      )))
+          (dolist (cds tgt-cds-list)
+            (cond ((eq contact-pt (elt *contact-pts* 0))
+                   (setq res (send *pr2* :inverse-kinematics (send (send cds :copy-worldcoords) :translate #f(50 0 0));;cds
+                                   :move-target contact-pt ;;(send *pr2* *use-arm* :end-coords)
+                                   :link-list (send *pr2* :link-list (send contact-pt :parent)) ;;(send *pr2* *use-arm* :end-coords :parent))
+                                   :collision-avoidance-link-pair (door-arm-collision-link-pair contact-pt)
+                                   :avoid-collision-distance 50
+                                   :avoid-collision-joint-gain 1.0
+                                   :avoid-collision-null-gain 100.0
+                                   :rotation-axis nil;;:z
+                                   :use-torso t
+                                   :use-base 0.5
+                                   :base-range (list :min (float-vector -500 -500 -90)
+                                                     :max (float-vector 500 500  90))
+                                   ;; :base-range (list :min (float-vector -150 0 -30)
+                                   ;;                   :max (float-vector 300 0  30))
+                                   :debug-view nil;;:no-message
+                                   ;;                      :additional-check #'(lambda () (not (door-base-collide)))
+                                   )
+                         )
+                   )
+                  ;;-----------------FOR FOREARM AND ELBOW--------------------------
+                  ((or (eq contact-pt (elt *contact-pts* 1)) (eq contact-pt (elt *contact-pts* 2)))
+                   (setq res (send *pr2* :inverse-kinematics (send (send (send cds :copy-worldcoords) :translate #f(50 0 0))  :rotate (deg2rad 90) :y);;cds
+                                   :move-target contact-pt ;;(send *pr2* *use-arm* :end-coords)
+                                   :link-list (send *pr2* :link-list (send contact-pt :parent)) ;;(send *pr2* *use-arm* :end-coords :parent))
+                                   :collision-avoidance-link-pair (door-arm-collision-link-pair contact-pt)
+                                   :avoid-collision-distance 50
+                                   :avoid-collision-joint-gain 1.0
+                                   :avoid-collision-null-gain 100.0
+                                   :rotation-axis (if (eq contact-pt (elt *contact-pts* 1)) :z nil) ;;:z for forearm nil for elbow 
+                                   :use-torso t
+                                   :use-base 1.0
+                                   :base-range (list :min (float-vector -1000 -1000 -90)
+                                                     :max (float-vector 1000 1000  90))
+                                   ;; :base-range (list :min (float-vector -150 0 -30)
+                                   ;;                   :max (float-vector 300 0  30))
+                                   :debug-view nil ;;:no-message
+                                   :additional-check #'(lambda () (not (door-base-collide))))
+                         )
+                   )
+                  )
+            (push (get-hold-door-torque cds contact-pt) torque-list)
+            (push (send *pr2* :copy-worldcoords) base-cds-list)
+            (push res motion-list)
+            (send *pr2* :move-to org-base-cds :world))
+          (push torque-list torque-list-seq)
+          (push base-cds-list base-cds-list-seq)
+          (push motion-list motion-list-seq)
+          )
+        ;; (push (reverse torque-list-seq) *sampled-torque-sequence*)
+        ;; (push (reverse base-cds-list-seq) *sampled-base-cds-sequence*)
+        (send (if (eq *use-arm* :rarm) *right-samples* *left-samples*) :push :torque-seq (reverse torque-list-seq))
+        (send (if (eq *use-arm* :rarm) *right-samples* *left-samples*) :push :base-seq (reverse base-cds-list-seq))
+        (send (if (eq *use-arm* :rarm) *right-samples* *left-samples*) :push :pose-seq (reverse motion-list-seq))
+        ))))
 
 
 (defun door-arm-collide
@@ -152,12 +204,13 @@
 
 
 
- (defun play-motion
+(defun play-motion
   ()
-  (let ((motion-list-seq (reverse *sampled-motion-sequence*))
-        (base-cds-list-seq (reverse *sampled-base-cds-sequence*))
-        (torque-list-seq (reverse *sampled-torque-sequence*)))
-    (dotimes (i 1);(length motion-list-seq))
+  (dolist (arm (list :rarm :larm))
+  (let ((motion-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :pose-seq))
+        (base-cds-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :base-seq))
+        (torque-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :torque-seq)))
+    (dotimes (i (length motion-list-seq))
       (dotimes (j (length (elt motion-list-seq i)))
         (send *door* :hinge :joint-angle (* (+ j 1) -20))
         (dotimes (k (length (elt (elt motion-list-seq i) j)))
@@ -165,11 +218,11 @@
             (send *pr2* :angle-vector (elt (elt (elt motion-list-seq i) j) k))
             (send *pr2* :move-to (elt (elt (elt base-cds-list-seq i) j) k) :world)
             (send *irtviewer* :draw-objects)
-            ;; (send *pr2* :draw-torque (send *irtviewer* :viewer) :torque-vector (scale 10 (elt (elt (elt torque-list-seq i) j) k)))
-            ;; (send *irtviewer* :viewer :viewsurface :flush)
-            (unix::usleep (* 1000 200)))
+            (send *pr2* :draw-torque (send *irtviewer* :viewer) :torque-vector (scale 5 (elt (elt (elt torque-list-seq i) j) k)))
+            (send *irtviewer* :viewer :viewsurface :flush)
+            (unix::usleep (* 1000 100)))
           )))
-    ))
+    )))
  
 (dolist (cds *contact-pts*)
   (send cds :draw-on :flush t :size 100 :color #f(1 0 0)))
