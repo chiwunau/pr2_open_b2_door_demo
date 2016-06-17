@@ -3,7 +3,7 @@
 (require "make-door.l")
 
 (setq *left-samples* nil)
-(setq *rightsamples* nil)
+(setq *right-samples* nil)
 
 
 
@@ -82,15 +82,15 @@
 ;;         res)
 ;;     (dolist (cds tgt-cds-list)
 ;;       (setq res (send *pr2* :rarm :inverse-kinematics cds :rotation-axis nil :debug-view :no-message))
-;;       (push res motion-list))
-;;   (push motion-list *sampled-motion-sequence*)))
+;;       (push res pose-list))
+;;   (push pose-list *sampled-motion-sequence*)))
 
 (defun motion-generation-new ()
   (let ((tgt-cds-list (reverse (send *door* :get-rear-touch-cds-list)))
-        motion-list
+        pose-list
         base-cds-list
         torque-list
-        motion-list-seq
+        pose-list-seq
         base-cds-list-seq
         torque-list-seq
         (org-base-cds (send *pr2* :copy-worldcoords))
@@ -100,11 +100,11 @@
       (set-contact-points)
       (dolist (contact-pt *contact-pts* )
         (setq torque-list-seq nil)
-        (setq motion-list-seq nil)
+        (setq pose-list-seq nil)
         (setq base-cds-list-seq nil)
         (dotimes (i 5)
           (setq torque-list nil)
-          (setq motion-list nil)
+          (setq pose-list nil)
           (setq base-cds-list nil)
           (send *door* :hinge :joint-angle (* (+ i 1) -20))
 
@@ -152,17 +152,17 @@
                   )
             (push (get-hold-door-torque cds contact-pt) torque-list)
             (push (send *pr2* :copy-worldcoords) base-cds-list)
-            (push res motion-list)
+            (push res pose-list)
             (send *pr2* :move-to org-base-cds :world))
           (push torque-list torque-list-seq)
           (push base-cds-list base-cds-list-seq)
-          (push motion-list motion-list-seq)
+          (push pose-list pose-list-seq)
           )
         ;; (push (reverse torque-list-seq) *sampled-torque-sequence*)
         ;; (push (reverse base-cds-list-seq) *sampled-base-cds-sequence*)
         (send (if (eq *use-arm* :rarm) *right-samples* *left-samples*) :push :torque-seq (reverse torque-list-seq))
         (send (if (eq *use-arm* :rarm) *right-samples* *left-samples*) :push :base-seq (reverse base-cds-list-seq))
-        (send (if (eq *use-arm* :rarm) *right-samples* *left-samples*) :push :pose-seq (reverse motion-list-seq))
+        (send (if (eq *use-arm* :rarm) *right-samples* *left-samples*) :push :pose-seq (reverse pose-list-seq))
         ))))
 
 
@@ -202,39 +202,87 @@
     )
   )
 
-
-
+(setq *play-speed* 200)
 (defun play-motion
-  ()
-  (dolist (arm (list :rarm :larm))
-  (let ((motion-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :pose-seq))
-        (base-cds-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :base-seq))
-        (torque-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :torque-seq)))
-    (dotimes (i (length motion-list-seq))
-      (dotimes (j (length (elt motion-list-seq i)))
-        (send *door* :hinge :joint-angle (* (+ j 1) -20))
-        (dotimes (k (length (elt (elt motion-list-seq i) j)))
-          (unless (eq (elt (elt (elt motion-list-seq i) j) k) nil)
-            (send *pr2* :angle-vector (elt (elt (elt motion-list-seq i) j) k))
-            (send *pr2* :move-to (elt (elt (elt base-cds-list-seq i) j) k) :world)
-            (send *irtviewer* :draw-objects)
-            (send *pr2* :draw-torque (send *irtviewer* :viewer) :torque-vector (scale 5 (elt (elt (elt torque-list-seq i) j) k)))
-            (send *irtviewer* :viewer :viewsurface :flush)
-            (unix::usleep (* 1000 100)))
-          )))
-    )))
- 
-(dolist (cds *contact-pts*)
-  (send cds :draw-on :flush t :size 100 :color #f(1 0 0)))
+  (&optional motion)
+  (if motion
+      (dotimes (i (length (car motion)))
+        (if (elt (elt motion 0) i)
+            (progn
+              (send *door* :hinge :joint-angle (* (+ i 1) -20))
+              (send *pr2* :angle-vector (elt (elt motion 0) i))
+              (send *pr2* :move-to (elt (elt motion 1) i) :world)
+              (send *irtviewer* :draw-objects)
+              (send *pr2* :draw-torque (send *irtviewer* :viewer) :torque-vector (scale 5 (elt (elt motion 2) i)))
+              (send *irtviewer* :viewer :viewsurface :flush)
+               (print (pqp-collision-check *pr2* *door*))
+              ))
+        (unix::usleep (* 1000 *play-speed*)))
+    ;;else
+    (dolist (arm (list :rarm :larm))
+      (let ((pose-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :pose-seq))
+            (base-cds-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :base-seq))
+            (torque-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :torque-seq)))
+        (dotimes (i (length pose-list-seq))
+          (dotimes (j (length (elt pose-list-seq i)))
+            (send *door* :hinge :joint-angle (* (+ j 1) -20))
+            (dotimes (k (length (elt (elt pose-list-seq i) j)))
+              (unless (eq (elt (elt (elt pose-list-seq i) j) k) nil)
+                (send *pr2* :angle-vector (elt (elt (elt pose-list-seq i) j) k))
+                (send *pr2* :move-to (elt (elt (elt base-cds-list-seq i) j) k) :world)
+                (send *irtviewer* :draw-objects)
+                (send *pr2* :draw-torque (send *irtviewer* :viewer) :torque-vector (scale 5 (elt (elt (elt torque-list-seq i) j) k)))
+                (send *irtviewer* :viewer :viewsurface :flush)
+                (unix::usleep (* 1000 50)))
+              )))))
+        ))
 
-(defun get-all-links (l)
-  (let ((r (list l)))
-    (dolist (d (send l :descendants))
-      (when (derivedp d bodyset-link)
-        (setq r (append r (get-all-links d)))))
-    r))  
-   
-    
+(defun get-random-motion
+  (&optional (arm :rarm) (idx 0))
+  (let* ((pose-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :pose-seq))
+         (base-cds-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :base-seq))
+         (torque-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :torque-seq))
+         motion
+         pl bl tl
+         pose-list base-list torque-list
+         zip-pose-list zip-base-list zip-torque-list) ;;get rid of nil
+
+    (setq pose-list (elt pose-list-seq (- 2 idx)))
+    (setq base-list (elt base-cds-list-seq (- 2 idx)))
+    (setq torque-list (elt torque-list-seq (- 2 idx)))
+
+      (dotimes (i (length pose-list)) ;;numbers of door angle
+        (let (tmplp tmplb tmplt)
+          (send *door* :hinge :joint-angle (* (+ i 1) -20)) ;;tmp for text
+          (dotimes (j (length (elt pose-list i))) ;;numbers of pose for one door angle
+            (send *pr2* :angle-vector (elt (elt pose-list i) j)) ;;tmp
+            (send *pr2* :move-to (elt (elt base-list i) j) :world) ;;tmp
+           (if (and (elt (elt pose-list i) j) (not (pqp-collision-check-objects (send *pr2* arm :links)  (send *door* :links))))
+                (progn
+                  (push (elt (elt pose-list i) j) tmplp)
+                  (push (elt (elt base-list i) j) tmplb)
+                  (push (elt (elt torque-list i) j) tmplt))))
+          (push tmplp zip-pose-list)
+          (push tmplb zip-base-list)
+          (push tmplt zip-torque-list)))
+            
+
+    (dotimes (i (length zip-pose-list))
+      (if (elt zip-pose-list i)
+          (progn
+            (let ((n (random (length (elt zip-pose-list i)))))
+              (push (elt (elt zip-pose-list i) n) pl)
+              (push (elt (elt zip-base-list i) n) bl)
+              (push (elt (elt zip-torque-list i) n) tl)))
+        (progn
+          (push nil pl)
+          (push nil bl)
+          (push nil tl))))
+    (setq motion (list pl bl tl))
+    motion))
+
+
+;;(dotimes (r 2) (dotimes (i 3) (play-motion (get-random-motion (if (= r 0) :rarm :larm) i)))) 
 ;;make-door
 ;;set-contact-points
 ;;motion-generation-new
