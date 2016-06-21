@@ -51,6 +51,7 @@
 
 (defun reset-scene ()
   (send *pr2* :move-to (make-coords) :world)
+  (send *door* :hinge :joint-angle 0)
   (set-contact-points)
   (setq *left-samples* (instance motion-samples :init))
   (setq *right-samples* (instance motion-samples :init)))
@@ -202,7 +203,7 @@
     )
   )
 
-(setq *play-speed* 200)
+(setq *play-speed* 50)
 (defun play-motion
   (&optional motion)
   (if motion
@@ -235,7 +236,7 @@
                 (send *irtviewer* :viewer :viewsurface :flush)
                 (unix::usleep (* 1000 50)))
               )))))
-        ))
+    ))
 
 (defun get-random-motion
   (&optional (arm :rarm) (idx 0))

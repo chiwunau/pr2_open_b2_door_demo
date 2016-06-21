@@ -43,7 +43,7 @@
 	   self))
 
   (:make-front-touch-cds-list
-   (door-width knob-height &optional (p 4) (q 4))
+   (door-width knob-height &optional (p 8) (q 8))
    (let (cds-list
          cds
          (y-step (/ (/ door-width 2) p))
@@ -60,15 +60,17 @@
      cds-list))
 
   (:make-rear-touch-cds-list
-   (door-width knob-height &optional (p 4) (q 4))
+   (door-width knob-height &optional (p 8) (q 8))
    (let (cds-list
          cds
-         (y-step (/ (/ door-width 2) p))
-         (z-step (/ (/ knob-height 2) q)))
+         ;; (y-step (/ (/ door-width 2) p))
+         ;; (z-step (/ (/ knob-height 2) q)))
+         (y-step (/ (/ door-width 1.5) p))
+         (z-step (/ (/ knob-height 1.5) q)))
      (dotimes (i p)  
        (dotimes (j q)
          (setq cds (make-cascoords))
-         (send cds :translate (float-vector (+ 10 door-thickness) (- door-width) (* 1.25 knob-height)))
+          (send cds :translate (float-vector (+ 10 door-thickness) (- door-width) (* 1.25 knob-height)))
          (send cds :translate (float-vector 0 (+ (* i y-step)) (- (* j z-step))))
          (send (send (send self :end-coords :parent) :parent) :assoc cds)
          (push cds cds-list)))
