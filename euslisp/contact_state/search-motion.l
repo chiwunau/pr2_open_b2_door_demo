@@ -4,6 +4,10 @@
 
 (setq *left-samples* nil)
 (setq *right-samples* nil)
+(setq *filtered-left-samples* nil)
+(setq *filtered-right-samples* nil)
+
+
 
 
 
@@ -155,9 +159,9 @@
             (push (send *pr2* :copy-worldcoords) base-cds-list)
             (push res pose-list)
             (send *pr2* :move-to org-base-cds :world))
-          (push torque-list torque-list-seq)
-          (push base-cds-list base-cds-list-seq)
-          (push pose-list pose-list-seq)
+          (push (reverse torque-list) torque-list-seq)
+          (push (reverse base-cds-list) base-cds-list-seq)
+          (push (reverse pose-list) pose-list-seq)
           )
         ;; (push (reverse torque-list-seq) *sampled-torque-sequence*)
         ;; (push (reverse base-cds-list-seq) *sampled-base-cds-sequence*)
@@ -205,7 +209,7 @@
 
 (setq *play-speed* 50)
 (defun play-motion
-  (&optional motion)
+  (&key (motion nil) (filter nil))
   (if motion
       (dotimes (i (length (car motion)))
         (if (elt (elt motion 0) i)
@@ -221,9 +225,10 @@
         (unix::usleep (* 1000 *play-speed*)))
     ;;else
     (dolist (arm (list :rarm :larm))
-      (let ((pose-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :pose-seq))
-            (base-cds-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :base-seq))
-            (torque-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :torque-seq)))
+      (let* ((samples (if filter (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) (if (eq arm :rarm) *right-samples* *left-samples*)))
+             (pose-list-seq (send samples :get :pose-seq))
+             (base-cds-list-seq (send samples :get :base-seq))
+             (torque-list-seq (send samples :get :torque-seq)))
         (dotimes (i (length pose-list-seq))
           (dotimes (j (length (elt pose-list-seq i)))
             (send *door* :hinge :joint-angle (* (+ j 1) -20))
@@ -282,6 +287,47 @@
     (setq motion (list pl bl tl))
     motion))
 
+(defun filter-samples ;;filter out pose that collide with door
+  ()
+  (setq *filtered-left-samples* (instance motion-samples :init))
+  (setq *filtered-right-samples* (instance motion-samples :init))
+
+  (dolist (arm (list :rarm :larm))
+    (let ((pose-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :pose-seq))
+          (base-cds-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :base-seq))
+          (torque-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :torque-seq))
+          filtered-pose-list-seq filtered-base-list-seq filtered-torque-list-seq)
+
+      (dotimes (i (length pose-list-seq)) ;;number of contact points
+        (let (pose-list base-list torque-list)
+          (dotimes (j (length (elt pose-list-seq i))) ;;number of door angle
+            (let (tmplp tmplb tmplt)
+              (send *door* :hinge :joint-angle (* (+ j 1) -20))
+              (dotimes (k (length (elt (elt pose-list-seq i) j)))
+                (send *pr2* :angle-vector (elt (elt (elt pose-list-seq i) j) k)) ;;tmp
+                (send *pr2* :move-to (elt (elt (elt base-cds-list-seq i) j) k) :world) ;;tmp
+                (if (and (elt (elt (elt pose-list-seq i) j) k) (not (pqp-collision-check-objects (send *pr2* arm :links)  (send *door* :links))))
+                    (progn
+                      (push (elt (elt (elt pose-list-seq i) j) k) tmplp)
+                      (push (elt (elt (elt base-cds-list-seq i) j) k) tmplb)
+                      (push (elt (elt (elt torque-list-seq i) j) k) tmplt))))
+              (push (reverse tmplp) pose-list)
+              (push (reverse tmplb) base-list)
+              (push (reverse tmplt) torque-list)))
+        (push (reverse pose-list) filtered-pose-list-seq)
+        (push (reverse base-list) filtered-base-list-seq)
+        (push (reverse torque-list) filtered-torque-list-seq)))
+
+      (dolist (l filtered-pose-list-seq)
+        (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :push :pose-seq l))
+      (dolist (l filtered-base-list-seq)
+        (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :push :base-seq l))
+      (dolist (l filtered-torque-list-seq)
+        (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :push :torque-seq l)))))
+
+
+
+      
 
 ;;(dotimes (r 2) (dotimes (i 3) (play-motion (get-random-motion (if (= r 0) :rarm :larm) i)))) 
 ;;make-door
