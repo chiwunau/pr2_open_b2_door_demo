@@ -245,46 +245,24 @@
 
 (defun get-random-motion
   (&optional (arm :rarm) (idx 0))
-  (let* ((pose-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :pose-seq))
-         (base-cds-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :base-seq))
-         (torque-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :torque-seq))
+  (let* ((pose-list (elt (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :get :pose-seq) idx))
+         (base-list (elt (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :get :base-seq) idx))
+         (torque-list (elt (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :get :torque-seq) idx))
          motion
-         pl bl tl
-         pose-list base-list torque-list
-         zip-pose-list zip-base-list zip-torque-list) ;;get rid of nil
+         pl bl tl)
 
-    (setq pose-list (elt pose-list-seq (- 2 idx)))
-    (setq base-list (elt base-cds-list-seq (- 2 idx)))
-    (setq torque-list (elt torque-list-seq (- 2 idx)))
-
-      (dotimes (i (length pose-list)) ;;numbers of door angle
-        (let (tmplp tmplb tmplt)
-          (send *door* :hinge :joint-angle (* (+ i 1) -20)) ;;tmp for text
-          (dotimes (j (length (elt pose-list i))) ;;numbers of pose for one door angle
-            (send *pr2* :angle-vector (elt (elt pose-list i) j)) ;;tmp
-            (send *pr2* :move-to (elt (elt base-list i) j) :world) ;;tmp
-           (if (and (elt (elt pose-list i) j) (not (pqp-collision-check-objects (send *pr2* arm :links)  (send *door* :links))))
-                (progn
-                  (push (elt (elt pose-list i) j) tmplp)
-                  (push (elt (elt base-list i) j) tmplb)
-                  (push (elt (elt torque-list i) j) tmplt))))
-          (push tmplp zip-pose-list)
-          (push tmplb zip-base-list)
-          (push tmplt zip-torque-list)))
-            
-
-    (dotimes (i (length zip-pose-list))
-      (if (elt zip-pose-list i)
+    (dotimes (i (length pose-list))
+      (if (elt pose-list i)
           (progn
-            (let ((n (random (length (elt zip-pose-list i)))))
-              (push (elt (elt zip-pose-list i) n) pl)
-              (push (elt (elt zip-base-list i) n) bl)
-              (push (elt (elt zip-torque-list i) n) tl)))
+            (let ((n (random (length (elt pose-list i)))))
+              (push (elt (elt pose-list i) n) pl)
+              (push (elt (elt base-list i) n) bl)
+              (push (elt (elt torque-list i) n) tl)))
         (progn
           (push nil pl)
           (push nil bl)
           (push nil tl))))
-    (setq motion (list pl bl tl))
+    (setq motion (list (reverse pl) (reverse bl) (reverse tl)))
     motion))
 
 (defun filter-samples ;;filter out pose that collide with door
