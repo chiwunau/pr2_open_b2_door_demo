@@ -219,6 +219,7 @@
               (send *pr2* :move-to (elt (elt motion 1) i) :world)
               (send *irtviewer* :draw-objects)
               (send *pr2* :draw-torque (send *irtviewer* :viewer) :torque-vector (scale 5 (elt (elt motion 2) i)))
+              (print (norm (elt (elt motion 2) i)))
               (send *irtviewer* :viewer :viewsurface :flush)
                (print (pqp-collision-check *pr2* *door*))
               ))
@@ -251,7 +252,7 @@
          motion
          pl bl tl)
 
-    (dotimes (i (length pose-list))
+    (dotimes (i (length pose-list)) ;;door angle
       (if (elt pose-list i)
           (progn
             (let ((n (random (length (elt pose-list i)))))

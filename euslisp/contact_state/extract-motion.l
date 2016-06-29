@@ -78,6 +78,35 @@
     (setq motion (list (reverse pl) (reverse bl) (reverse tl)))
     motion))
 
+(defun execute-door-motion (avs base-cds-list)
+  (let ((t-interval 1000.0) ;msec
+        traj-points
+        diff-v
+        diff-cds
+        sttm)
+    
+    (dotimes (i (length base-cds-list))
+      ;; (if (= i 0)
+          (setq diff-cds (send (send *pr2* :copy-worldcoords) :transformation (elt base-cds-list i)))
+        ;; (setq diff-cds (send (elt base-cds-list (- i 1)) :transformation (elt base-cds-list i))))
+          (setq diff-v (send diff-cds :pos))
+          (push (float-vector (elt diff-v 0)
+                              (elt diff-v 1)
+                              (vector-angle #f(1 0 0) (matrix-column (send diff-cds :worldrot) 0) #f(0 0 1)))
+                              traj-points))
+
+    (setq sttm (ros::time+ (ros::time-now) (ros::time 2)))
+    (setq *traj-points* traj-points)
+    (setq *base-cds-list* base-cds-list)
+    (setq *avs* avs)
+
+    (send *ri* :angle-vector-sequence avs t-interval :default-controller sttm)
+    (send *ri* :move-trajectory-sequence 
+          (reverse traj-points)
+          (make-list (length base-cds-list) :initial-element t-interval)
+          :start-time sttm
+          :send-action t)
+    ))
 
     
 
