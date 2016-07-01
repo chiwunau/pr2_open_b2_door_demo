@@ -78,13 +78,18 @@
     (setq motion (list (reverse pl) (reverse bl) (reverse tl)))
     motion))
 
+
+
+
+
 (defun execute-door-motion (avs base-cds-list)
-  (let ((t-interval 1000.0) ;msec
+  (let ((t-interval 5000.0) ;msec
         traj-points
         diff-v
         diff-cds
         sttm)
-    
+
+    (send *pr2* :move-to (elt base-cds-list 0) :world)
     (dotimes (i (length base-cds-list))
       ;; (if (= i 0)
           (setq diff-cds (send (send *pr2* :copy-worldcoords) :transformation (elt base-cds-list i)))
@@ -100,7 +105,8 @@
     (setq *base-cds-list* base-cds-list)
     (setq *avs* avs)
 
-    (send *ri* :angle-vector-sequence avs t-interval :default-controller sttm)
+    (send *ri* :angle-vector-sequence avs (list t-interval) :default-controller sttm)
+    (print "check")
     (send *ri* :move-trajectory-sequence 
           (reverse traj-points)
           (make-list (length base-cds-list) :initial-element t-interval)
