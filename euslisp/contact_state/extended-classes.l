@@ -92,7 +92,7 @@
               (float-vector (elt diff-pos-rot 0)
                             (elt diff-pos-rot 1)
                             (rad2deg (elt diff-pos-rot 5))))
-        (setq *link-list-with-virtual-link* ll)
+        (setq *link-list-with-virtual-link* ll) ;;for calc-dtau-dtheta ;;au
         (send-super* :inverse-kinematics target-coords
                      :rthre rthre
                      :thre thre

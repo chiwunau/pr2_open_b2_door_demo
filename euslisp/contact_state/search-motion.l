@@ -81,16 +81,7 @@
     (setq *contact-pts* (reverse *contact-pts*))
     ))
 
-;; (defun motion-generation ()
-;;   (let ((tgt-cds-list (send *door* :get-rear-touch-cds-list))
-;;         motion-list
-;;         res)
-;;     (dolist (cds tgt-cds-list)
-;;       (setq res (send *pr2* :rarm :inverse-kinematics cds :rotation-axis nil :debug-view :no-message))
-;;       (push res pose-list))
-;;   (push pose-list *sampled-motion-sequence*)))
-
-(defun motion-generation-new ()
+(defun motion-generation ()
   (let ((tgt-cds-list (reverse (send *door* :get-rear-touch-cds-list)))
         pose-list
         base-cds-list
@@ -99,11 +90,13 @@
         base-cds-list-seq
         torque-list-seq
         (org-base-cds (send *pr2* :copy-worldcoords))
-        res)
+        res
+        tgt-cds)
+    
     (dolist (arm (list :rarm :larm))
       (setq *use-arm* arm)
       (set-contact-points)
-      (dolist (contact-pt *contact-pts* )
+      (dolist (contact-pt *contact-pts*)
         (setq torque-list-seq nil)
         (setq pose-list-seq nil)
         (setq base-cds-list-seq nil)
@@ -114,8 +107,11 @@
           (send *door* :hinge :joint-angle (* (+ i 1) -20))
 
           (dolist (cds tgt-cds-list)
-            (cond ((eq contact-pt (elt *contact-pts* 0))
-                   (setq res (send *pr2* :inverse-kinematics (send (send cds :copy-worldcoords) :translate #f(50 0 0));;cds
+            (cond (
+                   ;;-----------------FOR END-EFFECTOR--------------------------
+                   (eq contact-pt (elt *contact-pts* 0))
+                   (setq tgt-cds (send (send cds :copy-worldcoords) :translate #f(50 0 0))) ;;shift from cds
+                   (setq res (send *pr2* :inverse-kinematics tgt-cds
                                    :move-target contact-pt ;;(send *pr2* *use-arm* :end-coords)
                                    :link-list (send *pr2* :link-list (send contact-pt :parent)) ;;(send *pr2* *use-arm* :end-coords :parent))
                                    :collision-avoidance-link-pair (door-arm-collision-link-pair contact-pt)
@@ -129,14 +125,29 @@
                                                      :max (float-vector 500 500  90))
                                    ;; :base-range (list :min (float-vector -150 0 -30)
                                    ;;                   :max (float-vector 300 0  30))
+                                   :warnp nil
                                    :debug-view nil;;:no-message
                                    ;;                      :additional-check #'(lambda () (not (door-base-collide)))
-                                   )
-                         )
+                                   ))
+                   (when res 
+                     (setq res (send *pr2* :inverse-kinematics tgt-cds
+                                     :move-target contact-pt
+                                     :link-list (send *pr2* :link-list (send contact-pt :parent))
+                                     :null-space #'(lambda () 
+                                                     (let* ((drw (door-reaction-wrench cds contact-pt))
+                                                           (z (calc-torque-norm-gradient (car drw) (cadr drw) (send contact-pt :copy-worldcoords) :link-list (send *pr2* :link-list (send contact-pt :parent)) :move-target contact-pt :use-base t)))
+                                                       (scale -0.0 z)))
+                                     :rotation-axis nil
+                                     :use-torso t
+                                     :use-base t
+                                     :warnp nil
+                                     :debug-view nil)))
                    )
+
                   ;;-----------------FOR FOREARM AND ELBOW--------------------------
                   ((or (eq contact-pt (elt *contact-pts* 1)) (eq contact-pt (elt *contact-pts* 2)))
-                   (setq res (send *pr2* :inverse-kinematics (send (send (send cds :copy-worldcoords) :translate #f(50 0 0))  :rotate (deg2rad 90) :y);;cds
+                   (setq tgt-cds (send (send (send cds :copy-worldcoords) :translate #f(50 0 0))  :rotate (deg2rad 90) :y))
+                   (setq res (send *pr2* :inverse-kinematics tgt-cds
                                    :move-target contact-pt ;;(send *pr2* *use-arm* :end-coords)
                                    :link-list (send *pr2* :link-list (send contact-pt :parent)) ;;(send *pr2* *use-arm* :end-coords :parent))
                                    :collision-avoidance-link-pair (door-arm-collision-link-pair contact-pt)
@@ -150,14 +161,32 @@
                                                      :max (float-vector 1000 1000  90))
                                    ;; :base-range (list :min (float-vector -150 0 -30)
                                    ;;                   :max (float-vector 300 0  30))
-                                   :debug-view nil ;;:no-message
+                                   :warnp nil
+                                   :debug-view nil;;:no-message
                                    :additional-check #'(lambda () (not (door-base-collide))))
                          )
+                   (when res 
+                     (setq res (send *pr2* :inverse-kinematics tgt-cds
+                                     :move-target contact-pt
+                                     :link-list (send *pr2* :link-list (send contact-pt :parent))
+                                     :null-space #'(lambda () 
+                                                     (let* ((drw (door-reaction-wrench cds contact-pt))
+                                                           (z (calc-torque-norm-gradient (car drw) (cadr drw) (send contact-pt :copy-worldcoords) :link-list (send *pr2* :link-list (send contact-pt :parent)) :move-target contact-pt :use-base t)))
+                                                       (scale -0.005 z)))
+                                     :rotation-axis nil
+                                     :use-torso t
+                                     :use-base t
+                                     :warnp nil
+                                     :debug-view nil)))
+
                    )
                   )
-            (push (get-hold-door-torque cds contact-pt) torque-list)
-            (push (send *pr2* :copy-worldcoords) base-cds-list)
-            (push res pose-list)
+            
+            (let* ((drw (door-reaction-wrench cds contact-pt)))
+              (push (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords  (list contact-pt)) torque-list)
+              (push (send *pr2* :copy-worldcoords) base-cds-list)
+              (push res pose-list)
+              )
             (send *pr2* :move-to org-base-cds :world))
           (push (reverse torque-list) torque-list-seq)
           (push (reverse base-cds-list) base-cds-list-seq)
@@ -191,9 +220,9 @@
         (push (list l2 l1) res))) ;;robot-link obstacle
     res))
 
-(defun get-hold-door-torque (cds-on-door-plane contact-cds)
+(defun door-reaction-wrench (cds-on-door-plane contact-cds)
   (let ((cds cds-on-door-plane)
-        (tau 1000.0) ;;just any number, no real data
+        (tau (* 2.5 9.8 700)) ;;just any number, no real data
         (moment #f(0 0 0))
         (target-cds contact-cds)
         force
@@ -203,9 +232,25 @@
     (setq dist-to-hinge (abs (elt (send (send cds :transformation (send (send *door* :hinge :parent-link) :worldcoords)) :pos) 1)))
     (setq force (float-vector (/ tau dist-to-hinge) 0 0)) ;;force in door plane cds
     (setq force (send target-cds :inverse-transform-vector (send cds :transform-vector force))) ;;force in contact-cds
-    (send *pr2* :calc-torque-from-ext-wrenches :force-list (list force) :moment-list (list moment) :target-coords  (list target-cds))
+    (list force moment)
     )
   )
+
+;; (defun get-hold-door-torque (cds-on-door-plane contact-cds)
+;;   (let ((cds cds-on-door-plane)
+;;         (tau (* 2.5 9.8 700)) ;;just any number, no real data
+;;         (moment #f(0 0 0))
+;;         (target-cds contact-cds)
+;;         force
+;;         dist-to-hinge
+;;         res)
+    
+;;     (setq dist-to-hinge (abs (elt (send (send cds :transformation (send (send *door* :hinge :parent-link) :worldcoords)) :pos) 1)))
+;;     (setq force (float-vector (/ tau dist-to-hinge) 0 0)) ;;force in door plane cds
+;;     (setq force (send target-cds :inverse-transform-vector (send cds :transform-vector force))) ;;force in contact-cds
+;;     (send *pr2* :calc-torque-from-ext-wrenches :force-list (list force) :moment-list (list moment) :target-coords  (list target-cds))
+;;     )
+;;   )
 
 (setq *play-speed* 50)
 (defun play-motion
@@ -311,5 +356,5 @@
 ;;(dotimes (r 2) (dotimes (i 3) (play-motion (get-random-motion (if (= r 0) :rarm :larm) i)))) 
 ;;make-door
 ;;set-contact-points
-;;motion-generation-new
+;;motion-generation
 ;;play-motion
