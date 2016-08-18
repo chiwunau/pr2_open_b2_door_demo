@@ -13,24 +13,40 @@
       (send *pr2* :inverse-kinematics tgt
                 :move-target (send *pr2* :rarm :end-coords) 
                 :link-list link-list
-                :stop 100
+                :stop 1000
                 ;;  :null-space #f(0 0 0 0.0 0.0 0.0 0 0 0 0 0.1)
                                         ;      :null-space #f(0.0 0 0 0.0 0 0 0.0 0.02)
                 :null-space #'(lambda () 
-                                (print "check")
-                                (let ((z (calc-torque-norm-gradient #f(0 0 30) #f(0 0 0) (send tgt :copy-worldcoords) :link-list link-list :move-target (send *pr2* :rarm :end-coords) :use-base t)))
+;;                                (print "check")
+                                (let ((z (calc-torque-norm-gradient #f(60 0 0) #f(0 0 0) (send tgt :copy-worldcoords) :link-list link-list :move-target (send *pr2* :rarm :end-coords) :use-base t)))
                                         ;                           (print z)
-                                  (scale -0.001 z)))
-                                        ;      :collision-avoidance-link-pair (mapcar #'(lambda (l) (list l c)) (send *pr2* :rarm :links)) 
-                :debug-view t;;:no-message
-                :rotation-axis t
-                :use-torso 0
+                                  (scale -0.005 z)))
+                :collision-avoidance-link-pair (mapcar #'(lambda (l) (list l c)) (send *pr2* :rarm :links)) 
+                :debug-view :no-message
+                :rotation-axis nil
+                :use-torso t
                 :use-base t
+                :additional-check #'(lambda ()
+                                      (let* ((max-torque (send *pr2* :max-torque-vector))
+                                             (overload nil)
+                                             torque
+                                             )
+                                        (setq force-cds (make-cascoords :coords tgt));;:pos (copy-object (send tgt :worldpos))))
+                                        (send (send *pr2* :rarm :end-coords :parent) :assoc force-cds)
+                                        (setq torque (send *pr2* :calc-torque-from-ext-wrenches :force-list (list #f(60 0 0)) :moment-list (list #f(0 0 0)) :target-coords (list force-cds)))
+                                        (print max-torque)
+                                        (print torque)
+                                        (dotimes (i (length max-torque))
+                                          (if (> 0 (- (abs (elt max-torque i)) (abs (elt torque i))))
+                                              (setq overload t)))
+                                        (print overload)
+                                        (not overload)))
+
                 )
     (return nil))
   (setq force-cds (make-cascoords :coords tgt));;:pos (copy-object (send tgt :worldpos))))
   (send (send *pr2* :rarm :end-coords :parent) :assoc force-cds)
-  (setq res (send *pr2* :calc-torque-from-ext-wrenches :force-list (list #f(0 0 30)) :moment-list (list #f(0 0 0)) :target-coords (list force-cds)))
+  (setq res (send *pr2* :calc-torque-from-ext-wrenches :force-list (list #f(50 0 0)) :moment-list (list #f(0 0 0)) :target-coords (list force-cds)))
                                         ;(send *pr2* :draw-torque (send *irtviewer* :viewer) :torque-vector (scale 5 res))
                                         ;(send *irtviewer* :viewer :viewsurface :flush)
   (print (mapcar #'(lambda (a b) (/ a b)) (coerce res cons) (coerce (send *pr2* :max-torque-vector) cons)))

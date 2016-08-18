@@ -141,7 +141,23 @@
                                      :use-torso t
                                      :use-base t
                                      :warnp nil
-                                     :debug-view nil)))
+                                     :debug-view nil
+                                     :additional-check #'(lambda ()
+                                                           (let* ((max-torque (send *pr2* :max-torque-vector))
+                                                                  (overload nil)
+                                                                  torque
+                                                                  )
+                                                             (setq force-cds (make-cascoords :coords tgt));;:pos (copy-object (send tgt :worldpos))))          
+                                                             (send (send *pr2* :rarm :end-coords :parent) :assoc force-cds)
+                                                             (setq torque (send *pr2* :calc-torque-from-ext-wrenches :force-list (list #f(60 0 0)) :moment-list (list #f(0 0 0)) :target-coords (list force-cds)))
+                                                             ;;(print max-torque)
+                                                             ;;(print torque)
+                                                             (dotimes (i (length max-torque))
+                                                               (if (> 0 (- (abs (elt max-torque i)) (abs (elt torque i))))
+                                                                   (setq overload t)))
+                                                             (print overload)
+                                                             (not overload)))
+                                     )))
                    )
 
                   ;;-----------------FOR FOREARM AND ELBOW--------------------------
@@ -165,11 +181,11 @@
                                    :debug-view nil;;:no-message
                                    :additional-check #'(lambda () (not (door-base-collide))))
                          )
-                   (when res 
+                   (when res
                      (setq res (send *pr2* :inverse-kinematics tgt-cds
                                      :move-target contact-pt
                                      :link-list (send *pr2* :link-list (send contact-pt :parent))
-                                     :null-space #'(lambda () 
+                                     :null-space #'(lambda ()
                                                      (let* ((drw (door-reaction-wrench cds contact-pt))
                                                            (z (calc-torque-norm-gradient (car drw) (cadr drw) (send contact-pt :copy-worldcoords) :link-list (send *pr2* :link-list (send contact-pt :parent)) :move-target contact-pt :use-base t)))
                                                        (scale -0.005 z)))
@@ -177,8 +193,23 @@
                                      :use-torso t
                                      :use-base t
                                      :warnp nil
-                                     :debug-view nil)))
-
+                                     :debug-view nil
+                                     :additional-check #'(lambda ()
+                                                           (let* ((max-torque (send *pr2* :max-torque-vector))
+                                                                  (overload nil)
+                                                                  torque
+                                                                  )
+                                                             (setq force-cds (make-cascoords :coords tgt));;:pos (copy-object (send tgt :worldpos))))          
+                                                             (send (send *pr2* :rarm :end-coords :parent) :assoc force-cds)
+                                                             (setq torque (send *pr2* :calc-torque-from-ext-wrenches :force-list (list #f(60 0 0)) :moment-list (list #f(0 0 0)) :target-coords (list force-cds)))
+                                                             ;;(print max-torque)
+                                                             ;;(print torque)
+                                                             (dotimes (i (length max-torque))
+                                                               (if (> 0 (- (abs (elt max-torque i)) (abs (elt torque i))))
+                                                                   (setq overload t)))
+                                                             (print overload)
+                                                             (not overload)))
+                                     )))
                    )
                   )
             
@@ -222,7 +253,7 @@
 
 (defun door-reaction-wrench (cds-on-door-plane contact-cds)
   (let ((cds cds-on-door-plane)
-        (tau (* 2.5 9.8 700)) ;;just any number, no real data
+        (tau (* 2.5 9.8 700)) ;;2.5kg from handle
         (moment #f(0 0 0))
         (target-cds contact-cds)
         force
