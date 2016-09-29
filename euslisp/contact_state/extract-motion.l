@@ -39,7 +39,22 @@
     (setq motion (list (reverse pl) (reverse bl) (reverse tl)))
     motion))
 
-(defun min-torque-motion 
+
+(defun calc-pose-torque-overshoot
+  (tqv)
+  (let* ((max-tqv (send *pr2* :max-torque-vector))
+         (overshoot 0))
+    (dotimes (i (length max-tqv))
+      (let ((tmp (/ (abs (elt tqv i)) (abs (elt max-tqv i)))))
+        (if (<= tmp 1)
+            (setq overshoot (+ overshoot 0))
+          (setq overshoot (+ overshoot tmp)))))
+;;    (print overshoot)
+    overshoot))
+          
+           
+
+(defun min-torque-norm-motion 
   (&optional (arm :rarm) (idx 0))
   (let* ((pose-list (elt (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :get :pose-seq) idx))
          (base-list (elt (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :get :base-seq) idx))
