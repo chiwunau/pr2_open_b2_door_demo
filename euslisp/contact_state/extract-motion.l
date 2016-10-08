@@ -1,5 +1,4 @@
-
-(defun max-smoothness-motion 
+(defun max-smoothness-motion
   (&optional (arm :rarm) (idx 0))
   (let* ((pose-list (elt (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :get :pose-seq) idx))
          (base-list (elt (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :get :base-seq) idx))
@@ -10,17 +9,20 @@
 
     (let ((r (random (length (elt pose-list 0)))))
           (setq st-p (elt (elt pose-list 0) r))
-          (setq st-b (elt (elt pose-list 0) r)))
+          (setq st-b (elt (elt base-list 0) r)))
 
     (let ((p st-p)
-          next-p tmp-p min-dist dist p-idx)
+          (b st-b)
+          next-p tmp-p tmp-b min-dist dist p-idx)
       (dotimes (i (length pose-list)) ;;door angle
         (setq min-dist nil)
         (dotimes (j (length (elt pose-list i)))
           (setq tmp-p (elt (elt pose-list i) j))
-          (setq dist (v- p tmp-p))
-          (setf (elt dist 0) 0)
-          (setq dist (norm dist))
+          (setq tmp-b (elt (elt base-list i) j))
+;          (setq dist (v- p tmp-p))
+          (setq dist (calc-smoothness-between-pose p tmp-p b tmp-b))
+;;          (setf (elt dist 0) 0)
+;;          (setq dist (norm dist))
           (when (or (not min-dist) (< dist min-dist))
             (setq min-dist dist)
             (setq p-idx j)))
@@ -38,6 +40,24 @@
 
     (setq motion (list (reverse pl) (reverse bl) (reverse tl)))
     motion))
+
+
+(defun calc-smoothness-between-pose
+  (p1 p2 b1 b2) ;;pose1(reccent) pose2(next) base1(reccent) base2(next)
+  (let* ((cof-p 0.7)
+         (cof-b (- 1 cof-p))
+         (cof-b-trans 1.0)
+         (cof-b-rot 1.0)
+         (diff-p (v- p2 p1))
+         (diff-cds (send (send b1 :transformation b2) :copy-worldcoords)))
+
+    (setf (elt diff-p 0) 0)
+    (setq diff-p (deg2rad (norm diff-p)))
+    (setq diff-b (+ (* cof-b-trans (/ (norm (send diff-cds :pos)) 1000))
+                    (* cof-b-rot (abs (car (car (send diff-cds :rpy-angle)))))))
+    (format t "~A, ~A, " diff-p diff-b)
+    (format t "~A, ~A~%" (/ (norm (send diff-cds :pos)) 1000) (abs (car (car (send diff-cds :rpy-angle)))))
+    (+ (* cof-p diff-p) (* cof-b diff-b))))
 
 
 (defun calc-pose-torque-overshoot
@@ -92,9 +112,6 @@
 
     (setq motion (list (reverse pl) (reverse bl) (reverse tl)))
     motion))
-
-
-
 
 
 (defun execute-door-motion (avs base-cds-list)
