@@ -6,6 +6,8 @@
 (setq *right-samples* nil)
 (setq *filtered-left-samples* nil)
 (setq *filtered-right-samples* nil)
+(setq *graph-depth* 5) ;;door opening angle interpolation
+(setq *door-step* 20) ;;5*20=100deg
 (setq debugview-colli nil)
 (setq debugview-mintq nil)
 
@@ -14,7 +16,7 @@
 
 
 (defclass motion-samples
-  :slots (pose-seq base-seq torque-seq))
+  :slots (pose-seq base-seq torque-seq cds-info-seq))
 (defmethod motion-samples
   (:init
    ()
@@ -27,7 +29,9 @@
          ((eq name :base-seq)
           (push data base-seq))
          ((eq name :torque-seq)
-          (push data torque-seq))))
+          (push data torque-seq))
+         ((eq name :cds-info-seq)
+          (push data cds-info-seq))))
 
   (:get
    (name)
@@ -36,7 +40,9 @@
          ((eq name :base-seq)
           base-seq)
          ((eq name :torque-seq)
-          torque-seq)))
+          torque-seq)
+         ((eq name :cds-info-seq)
+          cds-info-seq)))
   )
 ;; (setq *sampled-motion-sequence* nil)
 ;; (setq *sampled-base-cds-sequence* nil)
@@ -63,19 +69,19 @@
   (setq *right-samples* (instance motion-samples :init)))
   )
 
-(defun set-contact-points ()
+(defun set-contact-points (&optional arm)
   (setq *contact-pts* nil)
   (let (pt0 pt1 pt2 pt3)
-    (setq pt0 (make-cascoords :coords (send *pr2* *use-arm* :end-coords :copy-worldcoords)))
-    (send (send *pr2* *use-arm* :end-coords :parent) :assoc pt0)
+    (setq pt0 (make-cascoords :coords (send *pr2* arm :end-coords :copy-worldcoords)))
+    (send (send *pr2* arm :end-coords :parent) :assoc pt0)
 
-    (setq pt1 (make-cascoords :coords (send (elt (send *pr2* *use-arm* :links) 4) :copy-worldcoords))) ;;r_forearm_roll_link
+    (setq pt1 (make-cascoords :coords (send (elt (send *pr2* arm :links) 4) :copy-worldcoords))) ;;r_forearm_roll_link
     (send pt1 :translate #f(200 0 0))
-    (send (elt (send *pr2* *use-arm* :links) 4) :assoc pt1)
+    (send (elt (send *pr2* arm :links) 4) :assoc pt1)
 
-    (setq pt2 (make-cascoords :coords (send (elt (send *pr2* *use-arm* :links) 3) :copy-worldcoords)))
+    (setq pt2 (make-cascoords :coords (send (elt (send *pr2* arm :links) 3) :copy-worldcoords)))
     (send pt2 :translate #f(-70 0 -70))
-    (send (elt (send *pr2* *use-arm* :links) 3) :assoc pt2)
+    (send (elt (send *pr2* arm :links) 3) :assoc pt2)
 
     (push pt0 *contact-pts*)
     (push pt1 *contact-pts*)
@@ -88,9 +94,11 @@
         pose-list
         base-cds-list
         torque-list
+        cds-info-list
         pose-list-seq
         base-cds-list-seq
         torque-list-seq
+        cds-info-list-seq
         (org-base-cds (send *pr2* :copy-worldcoords))
         res
         tgt-cds)
@@ -98,16 +106,18 @@
     (dolist (arm (list :rarm :larm))
 ;;    (dolist (arm (list :larm))
       (setq *use-arm* arm)
-      (set-contact-points)
+      (set-contact-points arm)
       (dolist (contact-pt *contact-pts*)
         (setq torque-list-seq nil)
         (setq pose-list-seq nil)
         (setq base-cds-list-seq nil)
-        (dotimes (i 5)
+        (setq cds-info-list-seq nil)
+        (dotimes (i *graph-depth*)
           (setq torque-list nil)
           (setq pose-list nil)
           (setq base-cds-list nil)
-          (send *door* :hinge :joint-angle (* (+ i 1) -20))
+          (setq cds-info-list nil)
+          (send *door* :hinge :joint-angle (* (+ i 1) (- *door-step*)))
 
           (dolist (cds tgt-cds-list)
             (cond (
@@ -132,30 +142,31 @@
                                    :debug-view debugview-colli
                                    :additional-check #'(lambda () (not (door-base-collide)))
                                    ))
-                   (when res ;;when collision with door clear, search motion that satisfy torque limit
+                   (when nil ;;when collision with door clear, search motion that satisfy torque limit
                      (setq res (send *pr2* :inverse-kinematics tgt-cds
                                      :move-target contact-pt
                                      :link-list (send *pr2* :link-list (send contact-pt :parent))
                                      :null-space #'(lambda () 
                                                      (let* ((drw (door-reaction-wrench cds contact-pt))
                                                            (z (calc-torque-norm-gradient (car drw) (cadr drw) (send contact-pt :copy-worldcoords) :link-list (send *pr2* :link-list (send contact-pt :parent)) :move-target contact-pt :use-base t)))
-                                                       (scale -0.0 z)))
+                                                       (setq z (normalize-vector z))
+                                                       (scale -0.01 z)))
                                      :rotation-axis nil
                                      :use-torso t
                                      :use-base t
                                      :warnp nil
                                      :debug-view debugview-mintq
-                                     :additional-check #'(lambda ()
-                                                           (let* ((max-torque (send *pr2* :max-torque-vector))
-                                                                  (overload nil)
-                                                                  (drw (door-reaction-wrench cds contact-pt))
-                                                                  (torque (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords  (list contact-pt)))
-                                                                  )
-                                                             (dotimes (i (length max-torque))
-                                                               (if (> 0 (- (abs (elt max-torque i)) (abs (elt torque i))))
-                                                                   (setq overload t)))
-                                                             (if (not overload) (print "All joint torque limit satisfied!"))
-                                                             (not overload)))
+;;                                      :additional-check #'(lambda ()
+;;                                                            (let* ((max-torque (send *pr2* :max-torque-vector))
+;;                                                                   (overload nil)
+;;                                                                   (drw (door-reaction-wrench cds contact-pt))
+;;                                                                   (torque (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords  (list contact-pt)))
+;;                                                                   )
+;;                                                              (dotimes (i (length max-torque))
+;;                                                                (if (> 0 (- (abs (elt max-torque i)) (abs (elt torque i))))
+;;                                                                    (setq overload t)))
+;; ;;                                                             (if (not overload) (print "All joint torque limit satisfied!"))
+;;                                                              (not overload)))
                                      )))
                    )
 
@@ -174,36 +185,35 @@
                                    :use-base 1.0
                                    :base-range (list :min (float-vector -1000 -1000 -90)
                                                      :max (float-vector 1000 1000  90))
-                                   ;; :base-range (list :min (float-vector -150 0 -30)
-                                   ;;                   :max (float-vector 300 0  30))
                                    :warnp nil
                                    :debug-view debugview-colli
                                    :additional-check #'(lambda () (not (door-base-collide))))
                          )
-                   (when res
+                   (when nil
                      (setq res (send *pr2* :inverse-kinematics tgt-cds
                                      :move-target contact-pt
                                      :link-list (send *pr2* :link-list (send contact-pt :parent))
                                      :null-space #'(lambda ()
                                                      (let* ((drw (door-reaction-wrench cds contact-pt))
                                                            (z (calc-torque-norm-gradient (car drw) (cadr drw) (send contact-pt :copy-worldcoords) :link-list (send *pr2* :link-list (send contact-pt :parent)) :move-target contact-pt :use-base t)))
-                                                       (scale -0.005 z)))
+                                                       (setq z (normalize-vector z))
+                                                       (scale -0.01 z)))
                                      :rotation-axis nil
                                      :use-torso t
                                      :use-base t
                                      :warnp nil
                                      :debug-view debugview-mintq
-                                     :additional-check #'(lambda ()
-                                                           (let* ((max-torque (send *pr2* :max-torque-vector))
-                                                                  (overload nil)
-                                                                  (drw (door-reaction-wrench cds contact-pt))
-                                                                  (torque (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords  (list contact-pt)))
-                                                                  )
-                                                             (dotimes (i (length max-torque))
-                                                               (if (> 0 (- (abs (elt max-torque i)) (abs (elt torque i))))
-                                                                   (setq overload t)))
-                                                             (if (not overload) (print "All joint torque limit satisfied!"))
-                                                             (not overload)))
+                                     ;; :additional-check #'(lambda ()
+                                     ;;                       (let* ((max-torque (send *pr2* :max-torque-vector))
+                                     ;;                              (overload nil)
+                                     ;;                              (drw (door-reaction-wrench cds contact-pt))
+                                     ;;                              (torque (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords  (list contact-pt)))
+                                     ;;                              )
+                                     ;;                         (dotimes (i (length max-torque))
+                                     ;;                           (if (> 0 (- (abs (elt max-torque i)) (abs (elt torque i))))
+                                     ;;                               (setq overload t)))
+                                     ;;                         (if (not overload) (print "All joint torque limit satisfied!"))
+                                     ;;                         (not overload)))
                                      )))
                    )
                   )
@@ -212,17 +222,18 @@
               (push (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords  (list contact-pt)) torque-list)
               (push (send *pr2* :copy-worldcoords) base-cds-list)
               (push res pose-list)
+              (push (list (send cds :copy-worldcoords) (send tgt-cds :copy-worldcoords) (send contact-pt :copy-worldcoords)) cds-info-list)
               )
             (send *pr2* :move-to org-base-cds :world))
           (push (reverse torque-list) torque-list-seq)
           (push (reverse base-cds-list) base-cds-list-seq)
           (push (reverse pose-list) pose-list-seq)
+          (push (reverse cds-info-list) cds-info-list-seq)
           )
-        ;; (push (reverse torque-list-seq) *sampled-torque-sequence*)
-        ;; (push (reverse base-cds-list-seq) *sampled-base-cds-sequence*)
         (send (if (eq *use-arm* :rarm) *right-samples* *left-samples*) :push :torque-seq (reverse torque-list-seq))
         (send (if (eq *use-arm* :rarm) *right-samples* *left-samples*) :push :base-seq (reverse base-cds-list-seq))
         (send (if (eq *use-arm* :rarm) *right-samples* *left-samples*) :push :pose-seq (reverse pose-list-seq))
+        (send (if (eq *use-arm* :rarm) *right-samples* *left-samples*) :push :cds-info-seq (reverse cds-info-list-seq))
         ))))
 
 
@@ -246,9 +257,9 @@
         (push (list l2 l1) res))) ;;robot-link obstacle
     res))
 
-(defun door-reaction-wrench (cds-on-door-plane contact-cds)
+(defun door-reaction-wrench (cds-on-door-plane contact-cds &optional (door-weight 2.5))
   (let ((cds cds-on-door-plane)
-        (tau (* 2.5 9.8 700)) ;;2.5kg from handle
+        (tau (* door-weight 9.8 700)) ;;2.5kg from handle
         (moment #f(0 0 0))
         (target-cds contact-cds)
         force
@@ -278,14 +289,14 @@
 ;;     )
 ;;   )
 
-(setq *play-speed* 50)
+(setq *play-speed* 300)
 (defun play-motion
   (&key (motion nil) (filter nil))
   (if motion
       (dotimes (i (length (car motion)))
         (if (elt (elt motion 0) i)
             (progn
-              (send *door* :hinge :joint-angle (* (+ i 1) -20))
+              (send *door* :hinge :joint-angle (* (+ i 1) (- *door-step*)))
               (send *pr2* :angle-vector (elt (elt motion 0) i))
               (send *pr2* :move-to (elt (elt motion 1) i) :world)
               (send *irtviewer* :draw-objects)
@@ -347,12 +358,13 @@
     (let ((pose-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :pose-seq))
           (base-cds-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :base-seq))
           (torque-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :torque-seq))
-          filtered-pose-list-seq filtered-base-list-seq filtered-torque-list-seq)
+          (cds-info-list-seq (send (if (eq arm :rarm) *right-samples* *left-samples*) :get :cds-info-seq))
+          filtered-pose-list-seq filtered-base-list-seq filtered-torque-list-seq filtered-cds-info-list-seq)
 
       (dotimes (i (length pose-list-seq)) ;;number of contact points
-        (let (pose-list base-list torque-list)
+        (let (pose-list base-list torque-list cds-info-list)
           (dotimes (j (length (elt pose-list-seq i))) ;;number of door angle
-            (let (tmplp tmplb tmplt)
+            (let (tmplp tmplb tmplt tmplc)
               (send *door* :hinge :joint-angle (* (+ j 1) -20))
               (dotimes (k (length (elt (elt pose-list-seq i) j)))
                 (send *pr2* :angle-vector (elt (elt (elt pose-list-seq i) j) k)) ;;tmp
@@ -361,20 +373,28 @@
                     (progn
                       (push (elt (elt (elt pose-list-seq i) j) k) tmplp)
                       (push (elt (elt (elt base-cds-list-seq i) j) k) tmplb)
-                      (push (elt (elt (elt torque-list-seq i) j) k) tmplt))))
+                      (push (elt (elt (elt torque-list-seq i) j) k) tmplt)
+                      (push (elt (elt (elt cds-info-list-seq i) j) k) tmplc)
+                      )))
               (push (reverse tmplp) pose-list)
               (push (reverse tmplb) base-list)
-              (push (reverse tmplt) torque-list)))
-        (push (reverse pose-list) filtered-pose-list-seq)
-        (push (reverse base-list) filtered-base-list-seq)
-        (push (reverse torque-list) filtered-torque-list-seq)))
+              (push (reverse tmplt) torque-list)
+              (push (reverse tmplc) cds-info-list)
+              ))
+          (push (reverse pose-list) filtered-pose-list-seq)
+          (push (reverse base-list) filtered-base-list-seq)
+          (push (reverse torque-list) filtered-torque-list-seq)
+          (push (reverse cds-info-list) filtered-cds-info-list-seq)
+          ))
 
       (dolist (l filtered-pose-list-seq)
         (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :push :pose-seq l))
       (dolist (l filtered-base-list-seq)
         (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :push :base-seq l))
       (dolist (l filtered-torque-list-seq)
-        (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :push :torque-seq l)))))
+        (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :push :torque-seq l))
+      (dolist (l filtered-cds-info-list-seq)
+        (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :push :cds-info-seq l)))))
 
 
 
