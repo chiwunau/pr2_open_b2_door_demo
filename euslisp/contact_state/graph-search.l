@@ -36,6 +36,17 @@
               (push node *all-node*)))))))
   (setq *all-node* (reverse *all-node*)))
 
+(defun redefine-spare-arm ()
+  (dolist (n *all-node*)
+    (send *pr2* :angle-vector (send n :get :pose))
+    (if (equal (send n :get :arm) :larm)
+        (send *pr2* :rarm :angle-vector (get-tuckarm :larm :outside :rarm))
+      (send *pr2* :larm :angle-vector (get-tuckarm :rarm :outside :larm)))
+    (send *irtviewer* :draw-objects :flush t)
+    (send n :put :pose (send *pr2* :angle-vector))))
+
+
+
 (defun filter-out-nodes (&optional (door-weight 2.5))
   (setq *filtered-nodes* nil)
   (dolist (ns *sorted-nodes-by-graph-depth*)
@@ -93,22 +104,7 @@
   
 
 (defun set-start-goal-state ()  
-  (send *graph* :start-state (send *graph* :node "r-2-0-2"))
-  (send *graph* :goal-state (send *graph* :node "r-0-4-14"))
+  (send *graph* :start-state (send *graph* :node "l-0-0-2"))
+  (send *graph* :goal-state (send *graph* :node "l-0-4-7"))
 )
-    
-    
-  
-  
 
-  
-  
-
-              
-            
-          
-      
-     
-      
-    
-  

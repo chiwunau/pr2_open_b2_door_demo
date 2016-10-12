@@ -53,7 +53,8 @@
 (setq *contact-pts* nil)
 
 (defun init()
-  (pr2)
+  (unless (boundp '*pr2*)
+    (pr2))
   (objects *pr2*)
   (make-door)
   (objects *door*)

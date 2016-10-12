@@ -55,8 +55,8 @@
     (setq diff-p (deg2rad (norm diff-p)))
     (setq diff-b (+ (* cof-b-trans (/ (norm (send diff-cds :pos)) 1000))
                     (* cof-b-rot (abs (car (car (send diff-cds :rpy-angle)))))))
-    (format t "~A, ~A, " diff-p diff-b)
-    (format t "~A, ~A~%" (/ (norm (send diff-cds :pos)) 1000) (abs (car (car (send diff-cds :rpy-angle)))))
+    ;; (format t "~A, ~A, " diff-p diff-b)
+    ;; (format t "~A, ~A~%" (/ (norm (send diff-cds :pos)) 1000) (abs (car (car (send diff-cds :rpy-angle)))))
     (+ (* cof-p diff-p) (* cof-b diff-b))))
 
 
@@ -131,7 +131,9 @@
                               (elt diff-v 1)
                               (vector-angle #f(1 0 0) (matrix-column (send diff-cds :worldrot) 0) #f(0 0 1)))
                               traj-points))
-
+    
+    (send *ri* :angle-vector (car avs) 1000)
+    (send *ri* :wait-interpolation)
     (setq sttm (ros::time+ (ros::time-now) (ros::time 2)))
     (setq *traj-points* traj-points)
     (setq *base-cds-list* base-cds-list)
