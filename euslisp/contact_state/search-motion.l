@@ -370,7 +370,7 @@
               (dotimes (k (length (elt (elt pose-list-seq i) j)))
                 (send *pr2* :angle-vector (elt (elt (elt pose-list-seq i) j) k)) ;;tmp
                 (send *pr2* :move-to (elt (elt (elt base-cds-list-seq i) j) k) :world) ;;tmp
-                (if (and (elt (elt (elt pose-list-seq i) j) k) (not (pqp-collision-check-objects (send *pr2* arm :links)  (send *door* :links))))
+                (if (and (elt (elt (elt pose-list-seq i) j) k) (not (pqp-collision-check-objects (append (send *pr2* :torso :parent-link) (send *pr2* arm :links))  (send *door* :links))))
                     (progn
                       (push (elt (elt (elt pose-list-seq i) j) k) tmplp)
                       (push (elt (elt (elt base-cds-list-seq i) j) k) tmplb)

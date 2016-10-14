@@ -34,7 +34,8 @@
               
               (push node (elt *sorted-nodes-by-graph-depth* j))
               (push node *all-node*)))))))
-  (setq *all-node* (reverse *all-node*)))
+  (setq *all-node* (reverse *all-node*))
+  (redefine-spare-arm))
 
 (defun redefine-spare-arm ()
   (dolist (n *all-node*)
@@ -42,7 +43,7 @@
     (if (equal (send n :get :arm) :larm)
         (send *pr2* :rarm :angle-vector (get-tuckarm :larm :outside :rarm))
       (send *pr2* :larm :angle-vector (get-tuckarm :rarm :outside :larm)))
-    (send *irtviewer* :draw-objects :flush t)
+    ;; (send *irtviewer* :draw-objects :flush t)
     (send n :put :pose (send *pr2* :angle-vector))))
 
 
@@ -88,7 +89,7 @@
         (dolist (n2 ns2)
           (when (and (not (send n1 :get :overload?)) (not (send n2 :get :overload?)) (equal (send n1 :get :arm) (send n2 :get :arm)))
             (send *graph* :add-arc n1 n2 
-                  (calc-smoothness-between-pose  ;;cost of arc
+                  (calc-distance-between-pose  ;;cost of arc
                    (send n1 :get :pose) (send n2 :get :pose) (send n1 :get :base) (send n2 :get :base))
                   :both nil)))))))
           
@@ -104,7 +105,14 @@
   
 
 (defun set-start-goal-state ()  
-  (send *graph* :start-state (send *graph* :node "l-0-0-2"))
-  (send *graph* :goal-state (send *graph* :node "l-0-4-7"))
+  (send *graph* :start-state (send *graph* :node "r-2-0-2"))
+  (send *graph* :goal-state (send *graph* :node "r-0-3-1"))
 )
 
+(defun play-node (n)
+  (send *pr2* :angle-vector (send n :get :pose))
+  (send *pr2* :move-to (send n :get :base) :world)
+  (send *door* :hinge :joint-angle (send n :get :door-angle))
+  (send *irtviewer* :draw-objects :flush t))
+  
+  

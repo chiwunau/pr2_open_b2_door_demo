@@ -20,7 +20,7 @@
           (setq tmp-p (elt (elt pose-list i) j))
           (setq tmp-b (elt (elt base-list i) j))
 ;          (setq dist (v- p tmp-p))
-          (setq dist (calc-smoothness-between-pose p tmp-p b tmp-b))
+          (setq dist (calc-distance-between-pose p tmp-p b tmp-b))
 ;;          (setf (elt dist 0) 0)
 ;;          (setq dist (norm dist))
           (when (or (not min-dist) (< dist min-dist))
@@ -42,9 +42,9 @@
     motion))
 
 
-(defun calc-smoothness-between-pose
+(defun calc-distance-between-pose
   (p1 p2 b1 b2) ;;pose1(reccent) pose2(next) base1(reccent) base2(next)
-  (let* ((cof-p 0.7)
+  (let* ((cof-p 0.1)
          (cof-b (- 1 cof-p))
          (cof-b-trans 1.0)
          (cof-b-rot 1.0)
