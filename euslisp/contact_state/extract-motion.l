@@ -26,7 +26,7 @@
           (when (or (not min-dist) (< dist min-dist))
             (setq min-dist dist)
             (setq p-idx j)))
-          
+
         (if (elt (elt pose-list i) p-idx)
             (progn
               (push (elt (elt pose-list i) p-idx) pl)
@@ -41,20 +41,27 @@
     (setq motion (list (reverse pl) (reverse bl) (reverse tl)))
     motion))
 
-
+(setq *cof-p* 0.7)
 (defun calc-distance-between-pose
   (p1 p2 b1 b2) ;;pose1(reccent) pose2(next) base1(reccent) base2(next)
-  (let* ((cof-p 0.1)
+  (let* ((cof-p *cof-p*)
          (cof-b (- 1 cof-p))
          (cof-b-trans 1.0)
          (cof-b-rot 1.0)
          (diff-p (v- p2 p1))
          (diff-cds (send (send b1 :transformation b2) :copy-worldcoords)))
 
+    (print cof-p)
+    (print cof-b)
     (setf (elt diff-p 0) 0)
     (setq diff-p (deg2rad (norm diff-p)))
     (setq diff-b (+ (* cof-b-trans (/ (norm (send diff-cds :pos)) 1000))
                     (* cof-b-rot (abs (car (car (send diff-cds :rpy-angle)))))))
+
+    (format a "~A~%" diff-p)
+    (format b "~A~%" diff-b)
+    (format c "~A~%" (/ (norm (send diff-cds :pos)) 1000))
+    (format d "~A~%" (abs (car (car (send diff-cds :rpy-angle)))))
     ;; (format t "~A, ~A, " diff-p diff-b)
     ;; (format t "~A, ~A~%" (/ (norm (send diff-cds :pos)) 1000) (abs (car (car (send diff-cds :rpy-angle)))))
     (+ (* cof-p diff-p) (* cof-b diff-b))))
@@ -71,10 +78,8 @@
           (setq overshoot (+ overshoot tmp)))))
 ;;    (print overshoot)
     overshoot))
-          
-           
 
-(defun min-torque-norm-motion 
+(defun min-torque-norm-motion
   (&optional (arm :rarm) (idx 0))
   (let* ((pose-list (elt (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :get :pose-seq) idx))
          (base-list (elt (send (if (eq arm :rarm) *filtered-right-samples* *filtered-left-samples*) :get :base-seq) idx))
@@ -131,7 +136,7 @@
                               (elt diff-v 1)
                               (vector-angle #f(1 0 0) (matrix-column (send diff-cds :worldrot) 0) #f(0 0 1)))
                               traj-points))
-    
+
     (send *ri* :angle-vector (car avs) 1000)
     (send *ri* :wait-interpolation)
     (setq sttm (ros::time+ (ros::time-now) (ros::time 2)))
@@ -148,7 +153,3 @@
           :send-action t)
     ))
 
-    
-
-    
-    

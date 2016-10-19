@@ -350,6 +350,19 @@
     (setq motion (list (reverse pl) (reverse bl) (reverse tl)))
     motion))
 
+(defun calc-pose-torque-overshoot
+  (tqv)
+  (let* ((max-tqv (send *pr2* :max-torque-vector))
+         (overshoot 0))
+    (dotimes (i (length max-tqv))
+      (let ((tmp (/ (abs (elt tqv i)) (abs (elt max-tqv i)))))
+        (if (<= tmp 1)
+            (setq overshoot (+ overshoot 0))
+          (setq overshoot (+ overshoot tmp)))))
+;;    (print overshoot)
+    overshoot))
+
+
 (defun filter-samples ;;filter out pose that collide with door
   ()
   (setq *filtered-left-samples* (instance motion-samples :init))
