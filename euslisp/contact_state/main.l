@@ -1,0 +1,10 @@
+(load "search-motion.l")
+(load "extract-motion.l")
+(load "extended-classes.l")
+(load "extended-irtmodel.l")
+(load "calc-dtau-dtheta.l")
+
+(defun demo ()
+  (init)
+;;  (set-contact-points)
+  (motion-generation))
