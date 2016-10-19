@@ -80,9 +80,12 @@
 
 (defun init-graph ()
   (setq *graph* (instance costed-graph :init))
-  (send-all *all-node* :remove-all-arcs)
   (setq *start-node* (instance node :init "start"))
   (setq *end-node* (instance node :init "end"))
+
+  (send-all *all-node* :remove-all-arcs)
+  (send *start-node* :remove-all-arcs)
+  (send *end-node* :remove-all-arcs)
   
   (send *graph* :add-node *start-node*)
   (send *graph* :add-node *end-node*)
