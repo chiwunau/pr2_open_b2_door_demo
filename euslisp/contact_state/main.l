@@ -3,6 +3,7 @@
 (load "extended-classes.l")
 (load "extended-irtmodel.l")
 (load "calc-dtau-dtheta.l")
+(load "graph-search.l")
 
 (defun demo ()
   (init)

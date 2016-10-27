@@ -8,7 +8,7 @@
            (setq door-width (+ door-radius 95))
            (setq door-thickness (* 2 25))
 	   (send-super :init)
-	   (setq b (make-cube 25 (* 2 knob-radius) 20))
+	   (setq b (make-cube 30 (* 2 knob-radius) 25))
 	   (send b :locate (float-vector 0 knob-radius 0))
 	   (send b :set-color :red)
 	   (setq l3 (instance bodyset-link :init (make-cascoords) :bodies (list b) :name 'front-knob))
@@ -16,7 +16,7 @@
 	   (send l3 :assoc end-coords)
 	   (send l3 :locate (float-vector (+ 25 (- (+ 50 (/ 25 2.0))))  (* -1 door-radius) knob-height))
 
-           (setq b (make-cube 25 (* 2 knob-radius) 20))
+           (setq b (make-cube 30 (* 2 knob-radius) 25))
 	   (send b :locate (float-vector 0 knob-radius 0))
            (send b :set-color :red)
            (setq l4 (instance bodyset-link :init (make-cascoords) :bodies (list b) :name 'rear-knob))

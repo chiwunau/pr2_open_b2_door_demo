@@ -1,6 +1,6 @@
 (load "~/ros/hydro/src/jsk-ros-pkg/euslib/rbrain/virtual_interpolator.l")
 
-(setq *cof-p* 0.7)
+(setq *cof-p* 0.3)
 (defun calc-distance-between-pose
   (p1 p2 b1 b2) ;;pose1(reccent) pose2(next) base1(reccent) base2(next)
   (let* ((cof-p *cof-p*)
@@ -44,51 +44,57 @@
 
     overload))
 
+;; (defun transitable? (n1 n2)
+;;   (let* ((mid-pose (cadr (cadr (pos-list-interpolation (list (send n1 :get :pose) (send n2 :get :pose)) (list 1000) 500))))
+;;          (diff-cds (send (send (send n1 :get :base) :transformation (send n2 :get :base)) :copy-worldcoords))
+;;          (mid-cds (send (send (send (send n1 :get :base) :copy-worldcoords) :translate (scale 0.5 (send diff-cds :pos))) :rotate (* 0.5 (caar (send diff-cds :rpy-angle))) :z))
+;;          (mid-door-angle (/ (+ (send n1 :get :door-angle) (send n2 :get :door-angle)) 2)))
+
+;;     (send *pr2* :angle-vector mid-pose)
+;;     (send *pr2* :move-to mid-cds :world)
+;;     (send *door* :hinge :joint-angle mid-door-angle)
+;;     t
+;;    (not (pqp-collision-check-objects (append (send *pr2* :torso :parent-link) (send *pr2* (send n1 :get :arm) :links))  (send *door* :links)))
+;;     ))
+
 (defun transitable? (n1 n2)
-  (let* ((mid-pose (cadr (cadr (pos-list-interpolation (list (send n1 :get :pose) (send n2 :get :pose)) (list 1000) 500))))
+  (let* ((pose-pli (pos-list-interpolation (list (send n1 :get :pose) (send n2 :get :pose)) (list 750) 250))
          (diff-cds (send (send (send n1 :get :base) :transformation (send n2 :get :base)) :copy-worldcoords))
-         (mid-cds (send (send (send (send n1 :get :base) :copy-worldcoords) :translate (scale 0.5 (send diff-cds :pos))) :rotate (* 0.5 (caar (send diff-cds :rpy-angle))) :z))
-         (mid-door-angle (/ (+ (send n1 :get :door-angle) (send n2 :get :door-angle)) 2)))
+         (base-pos-rot-v (coerce (append (coerce (send diff-cds :pos) cons) (list (caar (send diff-cds :rpy-angle)))) float-vector))
+         (base-pli (pos-list-interpolation (list (coerce (make-list (length base-pos-rot-v) :initial-element 0) float-vector) base-pos-rot-v) (list 750) 250)))
+;;         (mid-cds (send (send (send (send n1 :get :base) :copy-worldcoords) :translate (scale 0.5 (send diff-cds :pos))) :rotate (* 0.5 (caar (send diff-cds :rpy-angle))) :z))
+  ;;       (mid-door-angle (/ (+ (send n1 :get :door-angle) (send n2 :get :door-angle)) 2)))
 
-    (send *pr2* :angle-vector mid-pose)
-    (send *pr2* :move-to mid-cds :world)
-    (send *door* :hinge :joint-angle mid-door-angle)
-    t
-   (not (pqp-collision-check-objects (append (send *pr2* :torso :parent-link) (send *pr2* (send n1 :get :arm) :links))  (send *door* :links)))
-    ))
+    (dotimes (i (length (cadr pose-pli)))
+      (let ((mid-cds (send (send (send (send n1 :get :base) :copy-worldcoords)
+                                 :translate (subseq (elt (cadr base-pli) i) 0 3))
+                           :rotate (elt (elt (cadr base-pli) i) 3) :z))
+            (mid-door-angle (+ (send n1 :get :door-angle) (* i (/ (- (send n2 :get :door-angle) (send n1 :get :door-angle)) (* 1.0 (- (length (cadr pose-pli)) 1)))))))
+        (send *pr2* :angle-vector (elt (cadr pose-pli) i))
+        (send *pr2* :move-to mid-cds :world)
+        (send *door* :hinge :joint-angle (+ mid-door-angle -3))
+        ;; (print (elt (cadr pose-pli) i))
+        ;; (print mid-cds)
+        ;; (print mid-door-angle)
+     ;; (print mid-door-angle)
+     (send *irtviewer* :draw-objects)
+     (unix::usleep (* 1000 500))
+        (let (tmpl) 
+          (dolist (dl (send *door* :links)) (unless ;; (string-equal (send dl :name) "rear-knob")
+                                                nil
+                                                (push dl tmpl)))
+          (when (pqp-collision-check-objects (append (send *pr2* :torso :parent-link) (send *pr2* (send n1 :get :arm) :links)) (send *door* :links))
+            ;; (send *irtviewer* :draw-objects)
+            ;; (unix::usleep (* 1000 500))
+            (return-from transitable? nil))
+          (dotimes (i 90) ;;make sure robot's arm do not collide with rear knob
+            (when (pqp-collision-check-objects (send *pr2* (send n1 :get :arm)  :links) (list (elt (send *door* :links) (position "rear-knob" (send-all (send *door* :links) :name) :test 'string-equal))))
+              (return-from transitable? nil))
+            (send *door* :hinge :joint-angle (+ i -90))
+;;            (send *irtviewer* :draw-objects)
+            )
+        )))
+    t))
 
-
-;;copy from /irteus/test
-;; (defun pos-list-interpolation
-;;   (pos-list ;; (list pos_1 pos_2 ... pos_N), pos_i is float-vector
-;;    time-list ;; (list dtime_1 dtime_2 ... dtime_{N-1}), dtime_i is time[s] between time at pos_{i+1} - pos_i
-;;    dt ;; dt [s]                              
-;;    &key (interpolator-class minjerk-interpolator)
-;;    ((:interpolator ip) (instance interpolator-class :init))
-;;    (initial-time 0.0) (neglect-first) (vel-vector-list) (acc-vector-list))
-;;   (let* ((data-list) (tm-list) (vel-data-list) (acc-data-list))
-;;     (send* ip :reset
-;;            :position-list pos-list
-;;            :time-list (let (r) (dolist (n time-list) (push (+ n (if r (car r) 0)) r)) (nreverse r)) ;; list of time[sec] from start for each control point
-;;            (append
-;;             (if vel-vector-list (list :vel-vector-list vel-vector-list))
-;;             (if acc-vector-list (list :acc-vector-list acc-vector-list))))
-;;     (send ip :start-interpolation)
-;;     (while (send ip :interpolatingp)
-;;       (push (if (send ip :interpolatingp)
-;;                 (+ initial-time (send ip :time))
-;;               (+ dt (car tm-list))) tm-list)
-;;       (send ip :pass-time dt)
-;;       (push (send ip :position) data-list)
-;;       (if (find-method ip :vel) (push (send ip :vel) vel-data-list))
-;;       (if (find-method ip :acc) (push (send ip :acc) acc-data-list))
-;;       )
-;;     (append
-;;      (list :data (if neglect-first (cdr (reverse data-list)) (reverse data-list))
-;;            :time (if neglect-first (cdr (reverse tm-list)) (reverse tm-list)))
-;;      (if (find-method ip :vel)
-;;          (list :vel (if neglect-first (cdr (reverse vel-data-list)) (reverse vel-data-list))))
-;;      (if (find-method ip :acc)
-;;          (list :acc (if neglect-first (cdr (reverse acc-data-list)) (reverse acc-data-list))))
-;;      )))
-
+(defun get-node (name)
+  (elt *all-node* (position name (send-all *all-node* :name) :test 'equal)))

@@ -89,27 +89,31 @@
   
   (send *graph* :add-node *start-node*)
   (send *graph* :add-node *end-node*)
+  ;;add nodes to graph
   (dolist (n *all-node*)
     (unless (send n :get :overload?)
       (send *graph* :add-node n)))
 
+  ;;add arcs to graph
   (dotimes (lv (- *graph-depth* 1))
     (let ((ns1 (elt *sorted-nodes-by-graph-depth* lv))
           (ns2 (elt *sorted-nodes-by-graph-depth* (+ lv 1))))
       (dolist (n1 ns1)
-        (when (= lv 0) ;;add start node
-          (send *graph* :add-arc *start-node* n1 1 :both nil))
-        (dolist (n2 ns2)
-          (when (= lv (- *graph-depth* 2)) ;;add end node
-            (send *graph* :add-arc n2 *end-node* 1 :both nil))
-
-          (when (and (not (send n1 :get :overload?)) (not (send n2 :get :overload?)) (equal (send n1 :get :arm) (send n2 :get :arm)))
-            (cond 
-             ((equal (send n1 :get :contact-point) (send n2 :get :contact-point))
-              (when (transitable? n1 n2)
-                (send *graph* :add-arc n1 n2
-                      (calc-distance-between-pose (send n1 :get :pose) (send n2 :get :pose) (send n1 :get :base) (send n2 :get :base)) ;;cost of arc
-                    :both nil)))))))))
+        (when (member n1 (send *graph* :nodes))
+          (if (equal (send n1 :get :level) 0) ;;add start node
+              (send *graph* :add-arc *start-node* n1 1 :both nil))
+          (dolist (n2 ns2)
+            (when (member n2 (send *graph* :nodes))
+              (if (equal (send n2 :get :level) (- *graph-depth* 1)) ;;add end node
+                  (send *graph* :add-arc n2 *end-node* 1 :both nil))
+          ;; (when (and (not (send n1 :get :overload?)) (not (send n2 :get :overload?)) (equal (send n1 :get :arm) (send n2 :get :arm)))
+              (cond 
+               ((and (equal (send n1 :get :arm) (send n2 :get :arm)) (equal (send n1 :get :contact-point) (send n2 :get :contact-point)))
+;                (print (transitable? n1 n2))
+                (if (transitable? n1 n2)
+                    (send *graph* :add-arc n1 n2
+                          (calc-distance-between-pose (send n1 :get :pose) (send n2 :get :pose) (send n1 :get :base) (send n2 :get :base)) ;;cost of arc
+                    :both nil))))))))))
   (set-start-goal-state))
 
 (defun solve-graph ()
@@ -131,4 +135,7 @@
   (send *pr2* :angle-vector (send n :get :pose))
   (send *pr2* :move-to (send n :get :base) :world)
   (send *door* :hinge :joint-angle (send n :get :door-angle))
-  (send *irtviewer* :draw-objects :flush t))
+  (send *irtviewer* :draw-objects :flush t)
+  (send *pr2* :draw-torque (send *irtviewer* :viewer) :torque-vector (scale 5 (send n :get :torque)))
+  (send *irtviewer* :viewer :viewsurface :flush))
+              

@@ -58,6 +58,10 @@
   (objects *pr2*)
   (make-door)
   (objects *door*)
+  ;;temp fix for bug where collisiion model does not update
+  (send *pr2* :make-collision-model-for-links)
+  (send (car (send *pr2* :torso :parent-link)) :make-pqpmodel)
+  ;;;;;;
   (setq *left-samples* (instance motion-samples :init))
   (setq *right-samples* (instance motion-samples :init)))
 
