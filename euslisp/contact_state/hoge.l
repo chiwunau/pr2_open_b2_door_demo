@@ -89,3 +89,12 @@ all-node, 787 nodes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+
+
+;;self collision-check
+(defun check-arm-self-collision
+  (&optional (arm :larm))
+  (let (tmpl)
+    (dolist (l (send *pr2* :links)) (unless (member l (send *pr2* arm :links)) (push l tmpl)))
+;    (push (car (send *pr2* :torso :parent-link)) tmpl)
+  (pqp-collision-check-objects (cdr (send *pr2* arm :links)) tmpl)))
