@@ -77,13 +77,12 @@
         ;; (print mid-cds)
         ;; (print mid-door-angle)
      ;; (print mid-door-angle)
-     (send *irtviewer* :draw-objects)
-     (unix::usleep (* 1000 500))
+     ;; (send *irtviewer* :draw-objects)
+     ;; (unix::usleep (* 1000 500))
         (let (tmpl) 
-          (dolist (dl (send *door* :links)) (unless ;; (string-equal (send dl :name) "rear-knob")
-                                                nil
+          (dolist (dl (send *door* :links)) (unless (string-equal (send dl :name) "rear-knob")
                                                 (push dl tmpl)))
-          (when (pqp-collision-check-objects (append (send *pr2* :torso :parent-link) (send *pr2* (send n1 :get :arm) :links)) (send *door* :links))
+          (when (or (pqp-collision-check-objects (append (send *pr2* :torso :parent-link) (send *pr2* (send n1 :get :arm) :links)) (send *door* :links)) (check-arm-self-collision (send n1 :get :arm)))
             ;; (send *irtviewer* :draw-objects)
             ;; (unix::usleep (* 1000 500))
             (return-from transitable? nil))
@@ -95,6 +94,13 @@
             )
         )))
     t))
+
+(defun check-arm-self-collision
+  (&optional (arm :larm))
+  (let (tmpl)
+    (dolist (l (send *pr2* :links)) (unless (member l (send *pr2* arm :links)) (push l tmpl)))
+    (push (car (send *pr2* :torso :parent-link)) tmpl)
+    (pqp-collision-check-objects (cdr (send *pr2* arm :links)) tmpl)))
 
 (defun get-node (name)
   (elt *all-node* (position name (send-all *all-node* :name) :test 'equal)))

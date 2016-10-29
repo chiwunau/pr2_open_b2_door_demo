@@ -104,11 +104,13 @@
               (send *graph* :add-arc *start-node* n1 1 :both nil))
           (dolist (n2 ns2)
             (when (member n2 (send *graph* :nodes))
-              (if (equal (send n2 :get :level) (- *graph-depth* 1)) ;;add end node
-                  (send *graph* :add-arc n2 *end-node* 1 :both nil))
+              (if (and (not (member *end-node* (send n2 :neighbors))) (equal (send n2 :get :level) (- *graph-depth* 1))) ;;add end node
+                    (send *graph* :add-arc n2 *end-node* 1 :both nil))
           ;; (when (and (not (send n1 :get :overload?)) (not (send n2 :get :overload?)) (equal (send n1 :get :arm) (send n2 :get :arm)))
               (cond 
                ((and (equal (send n1 :get :arm) (send n2 :get :arm)) (equal (send n1 :get :contact-point) (send n2 :get :contact-point)))
+               ;; ((equal (send n1 :get :arm) (send n2 :get :arm))
+
 ;                (print (transitable? n1 n2))
                 (if (transitable? n1 n2)
                     (send *graph* :add-arc n1 n2
