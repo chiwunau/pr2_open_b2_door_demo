@@ -132,7 +132,7 @@
                    (setq res (send *pr2* :inverse-kinematics tgt-cds
                                    :move-target contact-pt ;;(send *pr2* *use-arm* :end-coords)
                                    :link-list (send *pr2* :link-list (send contact-pt :parent)) ;;(send *pr2* *use-arm* :end-coords :parent))
-                                   :collision-avoidance-link-pair (door-arm-collision-link-pair contact-pt)
+                                   :collision-avoidance-link-pair (door-arm-base-collision-link-pair contact-pt)
                                    :avoid-collision-distance 50
                                    :avoid-collision-joint-gain 1.0
                                    :avoid-collision-null-gain 100.0
@@ -145,7 +145,6 @@
                                    ;;                   :max (float-vector 300 0  30))
                                    :warnp nil
                                    :debug-view debugview-colli
-                                   :additional-check #'(lambda () (not (door-base-collide)))
                                    ))
                    (when nil ;;when collision with door clear, search motion that satisfy torque limit
                      (setq res (send *pr2* :inverse-kinematics tgt-cds
@@ -181,7 +180,7 @@
                    (setq res (send *pr2* :inverse-kinematics tgt-cds
                                    :move-target contact-pt ;;(send *pr2* *use-arm* :end-coords)
                                    :link-list (send *pr2* :link-list (send contact-pt :parent)) ;;(send *pr2* *use-arm* :end-coords :parent))
-                                   :collision-avoidance-link-pair (door-arm-collision-link-pair contact-pt)
+                                   :collision-avoidance-link-pair (door-arm-base-collision-link-pair contact-pt)
                                    :avoid-collision-distance 50
                                    :avoid-collision-joint-gain 1.0
                                    :avoid-collision-null-gain 100.0
@@ -192,8 +191,7 @@
                                                      :max (float-vector 1000 1000  90))
                                    :warnp nil
                                    :debug-view debugview-colli
-                                   :additional-check #'(lambda () (not (door-base-collide))))
-                         )
+                         ))
                    (when nil
                      (setq res (send *pr2* :inverse-kinematics tgt-cds
                                      :move-target contact-pt
@@ -252,7 +250,7 @@
    (pqp-collision-check-objects (list (car (send *pr2* :torso :parent-link))) (send *door* :links))
   )
 
-(defun door-arm-collision-link-pair (contact-pt)
+(defun door-arm-base-collision-link-pair (contact-pt)
   (let ((ls1 (send *door* :links))
         (ls2 (send *pr2* :link-list (send contact-pt :parent)))
         res)
