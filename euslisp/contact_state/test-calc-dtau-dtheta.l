@@ -7,25 +7,36 @@
 (send (send *pr2* :rarm :end-coords :parent) :assoc force-cds)
 
 
-(setq link-list (send *pr2* :link-list (send *pr2* :rarm :end-coords :parent)))
-(dotimes (i 10)
-  (unless 
+(setq ll (send *pr2* :link-list (send *pr2* :rarm :end-coords :parent)))
+(setq mt (send *pr2* :rarm :end-coords))
+(dotimes (i 100)
       (send *pr2* :inverse-kinematics tgt
-                :move-target (send *pr2* :rarm :end-coords) 
-                :link-list link-list
-                :stop 1000
+                :move-target mt
+                :link-list ll
+;;                :stop 100
                 ;;  :null-space #f(0 0 0 0.0 0.0 0.0 0 0 0 0 0.1)
                                         ;      :null-space #f(0.0 0 0 0.0 0 0 0.0 0.02)
                 :null-space #'(lambda () 
 ;;                                (print "check")
-                                (let ((z (calc-torque-norm-gradient #f(60 0 0) #f(0 0 0) (send tgt :copy-worldcoords) :link-list link-list :move-target (send *pr2* :rarm :end-coords) :use-base t)))
-                                        ;                           (print z)
-                                  (scale -0.005 z)))
-                :collision-avoidance-link-pair (mapcar #'(lambda (l) (list l c)) (send *pr2* :rarm :links)) 
+                                (let ((z (calc-torque-norm-gradient #f(60 0 0) #f(0 0 0) (send tgt :copy-worldcoords) :link-list ll :move-target (send *pr2* :rarm :end-coords) :use-base t)))
+;;                                  (print z)
+                                  (setq z (normalize-vector z))
+;;                                  (print z)
+                                  (scale -0.1 z)))
+;;                :collision-avoidance-link-pair (mapcar #'(lambda (l) (list l c)) (send *pr2* :rarm :links)) 
                 :debug-view :no-message
-                :rotation-axis nil
+                :rotation-axis t
                 :use-torso t
-                :use-base t
+                :use-base t)
+
+      (let ((wrenches-tgt (make-cascoords :pos (copy-object (send mt :worldpos)) :rot (copy-object (send tgt :worldrot)))))
+            (send (send mt :parent) :assoc wrenches-tgt)
+            (setq torque (send *pr2* :calc-torque-from-ext-wrenches :force-list (list #f(60 0 0)) :moment-list (list #f(0 0 0)) :target-coords (list wrenches-tgt))))
+      ;; (send *irtviewer* :draw-objects)
+      (print (elt torque (+ 8 3)))
+     )
+
+
                 :additional-check #'(lambda ()
                                       (let* ((max-torque (send *pr2* :max-torque-vector))
                                              (overload nil)

@@ -98,3 +98,17 @@ all-node, 787 nodes
     (dolist (l (send *pr2* :links)) (unless (member l (send *pr2* arm :links)) (push l tmpl)))
 ;    (push (car (send *pr2* :torso :parent-link)) tmpl)
   (pqp-collision-check-objects (cdr (send *pr2* arm :links)) tmpl)))
+
+
+
+(setq buf (open "plot/torque.txt" 
+                :direction :output
+                :if-exists :new-version
+                :if-does-not-exist :create))
+(setq *torque* (reverse *torque*))
+
+(dolist (tq *torque*)
+  (format buf "~A~%" tq))
+
+(close buf)
+      
