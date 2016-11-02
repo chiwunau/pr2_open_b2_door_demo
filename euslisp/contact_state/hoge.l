@@ -112,3 +112,24 @@ all-node, 787 nodes
 
 (close buf)
       
+(dotimes (i 7)
+  (let* ((name (send (elt (send *pr2* :joint-list) (+ 8 i)) :name))
+        (f (open (format nil "test_torque/~A.txt" name)
+                      :direction :output
+                      :if-exists :new-version
+                      :if-does-not-exist :create)))
+    (format f "~A~%" name)
+    (dolist (tq *torque*)
+      (format f "~A~%" (elt tq (+ 8 i))))
+    
+    (close f)))
+
+(let ((f (open (format nil "test_torque/norm.txt")
+              :direction :output
+              :if-exists :new-version
+              :if-does-not-exist :create)))
+  (format f "~A~%" "Norm")
+  (dolist (tq *torque*)
+    (format f "~A~%" (norm tq)))
+  (close f))
+

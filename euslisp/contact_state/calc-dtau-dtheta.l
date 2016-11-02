@@ -69,22 +69,24 @@
   ;;  (print (transform tau dtau/dq))
    (setq *dtau/dq* dtau/dq)
    (setq *tau* tau)
-   (setq z (scale (elt tau (+ 0 1 3)) (matrix-row dtau/dq (+ 0 1 3))))
+   (setq z (scale (elt tau (+ 0 1 2)) (matrix-row dtau/dq (+ 0 1 2))))
    (setq *z* z)
+  (push tau-tmp *torque*)
    ;; (setq z (transform W (v+ (scale 0.5 (transform (transpose dtau/dq) tau)) (scale 0.5 (transform tau dtau/dq)))))
    ;; (print z)
    z))
-    
-
-    
 
 (defun calc-torque-gradient (force moment wrenches-cds &key link-list move-target (rotation-axis t) (translation-axis t) ((:jacobi tmp-jacobi)))
   (let* ((fik-len (send *pr2* :calc-target-joint-dimension link-list))
 ;;        (dim (send *pr2* :calc-target-axis-dimension rotation-axis translation-axis))
         (fik (setq fik (make-matrix fik-len fik-len)))
-        (f-proj (send move-target :inverse-transform-vector (send wrenches-cds :transform-vector force)))
-        (m-proj (send move-target :inverse-transform-vector (send wrenches-cds :transform-vector moment)))
-        (tmp-jacobi (if tmp-jacobi tmp-jacobi (send *pr2* :calc-jacobian-from-link-list link-list :move-target move-target :rotation-axis t :translation-axis t)))
+        ;; (f-proj (send move-target :inverse-transform-vector (send wrenches-cds :transform-vector force)))
+        ;; (m-proj (send move-target :inverse-transform-vector (send wrenches-cds :transform-vector moment)))
+        (f-proj (send (send (car link-list) :parent) :inverse-rotate-vector (send wrenches-cds :rotate-vector force)))
+        (m-proj (send (send (car link-list) :parent) :inverse-rotate-vector (send wrenches-cds :rotate-vector moment)))
+
+
+        (tmp-jacobi (if tmp-jacobi tmp-jacobi (send *pr2* :calc-jacobian-from-link-list link-list :move-target move-target :transform-coords (send (car link-list) :parent) :rotation-axis t :translation-axis t)))
         )
     (setq *jacobi* tmp-jacobi)
 ;    (print f-proj)
@@ -118,19 +120,18 @@
          diff-jacobi)
 
     (setq jacobi-q (if tmp-jacobi tmp-jacobi
-            (send *pr2* :calc-jacobian-from-link-list link-list :move-target move-target :rotation-axis t :translation-axis t)))
+            (send *pr2* :calc-jacobian-from-link-list link-list :move-target move-target :transform-coords (send (car link-list) :parent) :rotation-axis t :translation-axis t)))
 
-    (send j :joint-angle 
+    (send j :joint-angle
           (if (> (send j :joint-dof) 1)
               (progn
-                (print dof-count)
                 (setq dqv (instantiate float-vector (send j :joint-dof)))
                 ;; (setf (elt dqv dof-count) (rad2deg dq))
                 (setf (elt dqv dof-count) dq-om)
                 (v+ ang dqv))
             (+ ang dq)))
 
-    (setq jacobi-q+dq (send *pr2* :calc-jacobian-from-link-list link-list :move-target move-target :rotation-axis t :translation-axis t))
+    (setq jacobi-q+dq (send *pr2* :calc-jacobian-from-link-list link-list :move-target move-target :transform-coords (send (car link-list) :parent) :rotation-axis t :translation-axis t))
 
     (if (> (send j :joint-dof) 1)
         (setq diff-jacobi (scale-matrix (/ 1 dq-om) (m- jacobi-q+dq jacobi-q)))
