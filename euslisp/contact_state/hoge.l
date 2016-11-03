@@ -111,7 +111,8 @@ all-node, 787 nodes
   (format buf "~A~%" tq))
 
 (close buf)
-      
+
+;;;;plot all torque graph;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (dotimes (i 7)
   (let* ((name (send (elt (send *pr2* :joint-list) (+ 8 i)) :name))
         (f (open (format nil "test_torque/~A.txt" name)
@@ -119,6 +120,7 @@ all-node, 787 nodes
                       :if-exists :new-version
                       :if-does-not-exist :create)))
     (format f "~A~%" name)
+    (format f "~A~%" (elt (send *pr2* :max-torque-vector) (+ 8 i)))
     (dolist (tq *torque*)
       (format f "~A~%" (elt tq (+ 8 i))))
     
@@ -132,4 +134,4 @@ all-node, 787 nodes
   (dolist (tq *torque*)
     (format f "~A~%" (norm tq)))
   (close f))
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

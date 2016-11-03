@@ -16,6 +16,31 @@
   ;;     (use-base
 
 ;;----------------copy from irtmodel.l---------------------------;;
+ (:calc-torque-from-ext-wrenches-with-base
+   (&key (force-list) (moment-list) (target-coords) (link-list (mapcar #'(lambda (tc) (send self :link-list (send tc :parent))) target-coords)) ((:jacobi tmp-jacobi)))
+   (let* (
+          (jacobi
+           (if tmp-jacobi
+               tmp-jacobi
+             (send self :calc-jacobian-from-link-list
+                   link-list
+                   :move-target target-coords
+                   :transform-coords (mapcar #'(lambda (x) (make-coords)) target-coords)
+                   :rotation-axis (make-list (length target-coords) :initial-element t)
+                   :translation-axis (make-list (length target-coords) :initial-element t))
+             ))
+          (wrenches
+           (mapcar #'(lambda (f m) (concatenate float-vector f m)) force-list moment-list))
+          (tq (transform (transpose jacobi)
+                         (apply #'concatenate float-vector wrenches)))
+          (ret-tq (instantiate float-vector (length joint-list)))
+          (ul (send self :calc-union-link-list link-list)))
+     ;; tq = torque vector included in link-list                                                      
+     ;; ret-tq = all torque vector in joint-list                                                      
+     (dotimes (i (length ul))
+       (setf (elt ret-tq (position (send (elt ul i) :joint) joint-list)) (elt tq i)))
+     ret-tq))
+
    (:calc-joint-angle-speed-gain
    (union-link-list dav periodic-time)
    (setq *ullj* (send-all union-link-list :joint))

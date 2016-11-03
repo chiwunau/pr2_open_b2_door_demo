@@ -26,10 +26,13 @@
                 :debug-view :no-message
                 :rotation-axis nil
                 :use-torso t
-                :use-base nil)
+                :use-base nil
+                :base-range (list :min (float-vector 0 0 -90)
+                                  :max (float-vector 0 0  90))
+                )
+
 
       (let ((wrenches-tgt (make-cascoords :pos (copy-object (send mt :worldpos)) :rot (copy-object (send tgt :worldrot)))))
-        (send wrenches-tgt :translate #f(200 0 0))
         (send (send mt :parent) :assoc wrenches-tgt)
         (setq torque (send *pr2* :calc-torque-from-ext-wrenches :force-list (list #f(0 60 0)) :moment-list (list #f(0 0 0)) :target-coords (list wrenches-tgt))))
       ;; (send *irtviewer* :draw-objects)
