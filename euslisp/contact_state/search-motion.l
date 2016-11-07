@@ -68,10 +68,10 @@
 
 (defun reset-scene ()
   (send *pr2* :move-to (make-coords) :world)
+  (send *pr2* :reset-pose)
   (send *door* :hinge :joint-angle 0)
-  (set-contact-points)
   (setq *left-samples* (instance motion-samples :init))
-  (setq *right-samples* (instance motion-samples :init)))
+  (setq *right-samples* (instance motion-samples :init))
   )
 
 (defun set-contact-points (&optional arm)
@@ -250,17 +250,17 @@
    (pqp-collision-check-objects (list (car (send *pr2* :torso :parent-link))) (send *door* :links))
   )
 
-(defun door-arm-base-collision-link-pair (contact-pt)
+(defun door-arm-base-collision-link-pair (contact-pt &key (use-base t))
   (let ((ls1 (send *door* :links))
         (ls2 (send *pr2* :link-list (send contact-pt :parent)))
         res)
     (dolist (l1 ls1)
-      (push (list (send *pr2* :base_footprint_lk) l1) res)
+      (if use-base (push (list (send *pr2* :base_footprint_lk) l1) res))
       (dolist (l2 ls2)
         (push (list l2 l1) res))) ;;robot-link obstacle
     res))
 
-(defun door-reaction-wrench (cds-on-door-plane contact-cds &optional (door-weight 2.5))
+(defun door-reaction-wrench (cds-on-door-plane contact-cds &key (door-weight 2.5))
   (let ((cds cds-on-door-plane)
         (tau (* door-weight 9.8 700)) ;;2.5kg from handle
         (moment #f(0 0 0))

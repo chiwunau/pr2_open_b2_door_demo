@@ -13,26 +13,26 @@
     (let ((pose-seq (send samples :get :pose-seq))
           (base-seq (send samples :get :base-seq))
           (torque-seq (send samples :get :torque-seq))
-          (cds-info-seq (send samples :get :cds-info-seq)))
+          (cds-info-seq (send samples :get :cds-info-seq))
+          (contact-pts (set-contact-points (if (equal samples *filtered-left-samples*) :larm :rarm))))
 
       (dotimes (i (length pose-seq)) ;;number of contact-points
         (dotimes (j (length (elt pose-seq i))) ;;door-angle
           (dotimes (k (length (elt (elt pose-seq i) j))) ;;pose
-            (let ((node (instance node :init (format nil "~A-~A-~A-~A" 
+            (let ((node (instance node :init (format nil "~A-~A-~A-~A"
                                                      (if (equal samples *filtered-left-samples*) 'l 'r) i j k))))
               (send node :put :arm (if (equal samples *filtered-left-samples*) :larm :rarm))
-              (send node :put :contact-point i)
+              (send node :put :contact-point-idx i)
+              (send node :put :contact-point (elt contact-pts (- (length pose-seq) i 1)))
               (send node :put :level j)
               (send node :put :door-angle (* (+ j 1) -20))
               (send node :put :pose-idx k)
-              
               (send node :put :pose (elt (elt (elt pose-seq i) j) k))
               (send node :put :base (elt (elt (elt base-seq i) j) k))
               (send node :put :torque (elt (elt (elt torque-seq i) j) k))
-              (send node :put :cds-info (elt (elt (elt cds-info-seq i) j) k))
-              
+              (send node :put :cds-info (elt (elt (elt cds-info-seq i) j) k)) ;;cds-on-plane, shift-cds, contact-pt-cds
               (send node :put :overload? (overload-node? node door-weight))
-              
+
               (push node (elt *sorted-nodes-by-graph-depth* j))
               (push node *all-node*)))))))
   (setq *all-node* (reverse *all-node*))
@@ -59,7 +59,7 @@
 (defun overload-node? (n &optional (door-weight 2.5))
   (let* ((force-cds (elt (send n :get :cds-info) 0))
          ;;             (contact-pt (elt (send n :get :cds-info) 2))
-         (contact-pt (elt (reverse (set-contact-points (send n :get :arm))) (send n :get :contact-point)))
+         (contact-pt (send n :get :contact-point))
          (max-tq (send *pr2* :max-torque-vector))
          (overload nil)
          drw tq)
@@ -67,7 +67,7 @@
     (send *pr2* :move-to (send n :get :base) :world)
     (send *door* :hinge :joint-angle (send n :get :door-angle))
     
-    (setq drw (door-reaction-wrench force-cds contact-pt door-weight))
+    (setq drw (door-reaction-wrench force-cds contact-pt :door-weight door-weight))
     (setq tq (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords (list contact-pt)))
     
     (dotimes (i (length max-tq))

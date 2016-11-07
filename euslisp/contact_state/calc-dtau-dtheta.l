@@ -9,8 +9,8 @@
          z
          ll)
 
-    (let ((wrenches-tgt (make-cascoords :pos (copy-object (send move-target :worldpos)) :rot (copy-object (send wrenches-cds :worldrot)))))
-      (send (send move-target :parent) :assoc wrenches-tgt)
+   (let ((wrenches-tgt (make-cascoords :pos (copy-object (send move-target :worldpos)) :rot (copy-object (send wrenches-cds :worldrot)))))
+     (send (send move-target :parent) :assoc wrenches-tgt)
       (if use-base
           (setq tau-tmp (send *pr2* :calc-torque-from-ext-wrenches-with-base :force-list (list force) :moment-list (list moment) :link-list (cdr (send *pr2* :link-list (send wrenches-tgt :parent))) :target-coords (list wrenches-tgt)))
       (setq tau-tmp (send *pr2* :calc-torque-from-ext-wrenches :force-list (list force) :moment-list (list moment) :target-coords (list wrenches-tgt)))))
@@ -38,7 +38,6 @@
               (incf i)))
           )))
 
-     
      (t
       (setq ll link-list)
       (setq dtau/dq (calc-torque-gradient force moment wrenches-cds :link-list ll :move-target move-target))
@@ -53,7 +52,6 @@
           (setf (elt tmp-W i) (abs (/ (elt tau-tmp idx) (elt (send *pr2* :max-torque-vector) idx))))
 ;;          (setf (elt tmp-W i) 0.0)
           (incf i)))))
-     
 
 ;   (setf (elt tmp-W 1) 1.0)
 ;;   (print tmp-W)
@@ -74,13 +72,22 @@
    (setq *tau-tmp* tau-tmp)
    (setq *tau* tau)
    
-   (setq tmp-W #f(0 0 0 0 0 0 0 1 0))
-   ;; (dotimes (i (reduce '+ (send-all (send-all ll :joint) :joint-dof)))
-   ;;   (setq z (v+ z (scale (* (elt tmp-W i) (elt tau i)) (matrix-row dtau/dq i)))))
+  ;; (setq tmp-W #f(0 0 0 0 0 0 0 0 0 1 0))
+   (if use-base 
+       (setq tmp-W #f(0 0 0 0 0 0 0 0 0 1 0))
+     (setq tmp-W #f(0 0 0 0 0 0 1 0)))
 
+;;   (print (reduce '+ (send-all (send-all ll :joint) :joint-dof)))
+;   (print "----------------")
+   (dotimes (i (reduce '+ (send-all (send-all ll :joint) :joint-dof)))
+;;     (print (norm (scale (elt tau i) (matrix-row dtau/dq i))))
+     ;; (setq z (v+ z (scale (* (elt tmp-W i) (elt tau i)) (matrix-row dtau/dq i)))))
+     (setq z (v+ z (scale (elt tmp-W i) (normalize-vector (scale (elt tau i) (matrix-row dtau/dq i)))))))
 
-   (setq z (scale (elt tau (+ (if use-base 3 0) 6)) (matrix-row dtau/dq (+ (if use-base 3 0) 6))))
-   ;; (setq z (v+ z (scale (elt tau (+ (if use-base 3 0) 4)) (matrix-row dtau/dq (+ (if use-base 3 0) 4)))))
+ ;;  (print "----------------")
+
+   ;; (setq z (scale (elt tau (+ (if use-base 3 0) 6)) (matrix-row dtau/dq (+ (if use-base 3 0) 6))))
+   ;; (setq z (v+ z (scale (elt tau (+ (if use-base 3 0) 6)) (matrix-row dtau/dq (+ (if use-base 3 0) 6)))))
 
    ;; (setf (elt z 0) 0)
    ;; (setf (elt z 1) 0)
@@ -99,16 +106,13 @@
         ;; (f-proj (send move-target :inverse-transform-vector (send wrenches-cds :transform-vector force)))
         ;; (m-proj (send move-target :inverse-transform-vector (send wrenches-cds :transform-vector moment)))
         (f-proj (send (send *pr2* :copy-worldcoords);; (send (car link-list) :parent)
-                      :inverse-rotate-vector (send wrenches-cds :rotate-vector force)))
+                      :inverse-rotate-vector force))
         (m-proj (send (send *pr2* :copy-worldcoords);; (send (car link-list) :parent)
-                      :inverse-rotate-vector (send wrenches-cds :rotate-vector moment)))
-
-
+                      :inverse-rotate-vector moment))
         (tmp-jacobi (if tmp-jacobi tmp-jacobi (send *pr2* :calc-jacobian-from-link-list link-list :move-target move-target :transform-coords (send *pr2* :copy-worldcoords);; (send (car link-list) :parent)
                                                     :rotation-axis t :translation-axis t)))
         )
     (setq *jacobi* tmp-jacobi)
-;    (print f-proj)
     (setq *jl* (send-all link-list :joint))
     (dolist (j (send-all link-list :joint))
       (dotimes (dof-count (send j :joint-dof))

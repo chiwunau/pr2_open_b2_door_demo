@@ -27,6 +27,7 @@ def draw():
         plt.ylim([0, 5 + max(max(tq_data[i]), max_tq[i])])
         plt.plot(map(abs,tq_data[i]), "k")
         plt.title(name[i])
-        plt.axhline(y=max_tq[i],xmin=0,xmax=100,color='r')#axhline(y=max_tq)
+        if not name[i] == "Norm":
+            plt.axhline(y=max_tq[i],xmin=0,xmax=100,color='r')#axhline(y=max_tq)
 
     plt.show()

@@ -135,3 +135,24 @@ all-node, 787 nodes
     (format f "~A~%" (norm tq)))
   (close f))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+;; (setq drw0 (door-reaction-wrench (elt (send n :get :cds-info) 0) (elt (send n :get :cds-info) 1)))
+;; (setq wrenches-cds (elt (send n :get :cds-info) 1))
+;; (setq force (car drw0))
+;; (setq force #f(0 0 20))
+;; (setq moment (cadr drw0))
+
+(setq drw1 (door-reaction-wrench (elt (send n :get :cds-info) 0) (send n :get :contact-point)))
+(setq wrenches-cds (send n :get :contact-point))
+;; (setq force (car drw1))
+(setq force (send (send n :get :contact-point) :inverse-rotate-vector #f(0 0 20)))
+(setq moment (cadr drw1))
+(setq wrenches-tgt (make-cascoords :pos (copy-object (send move-target :worldpos)) :rot (copy-object (send wrenches-cds :worldrot))))
+(send (send move-target :parent) :assoc wrenches-tgt)
+(setq tau-tmp (send *pr2* :calc-torque-from-ext-wrenches :force-list (list #f(0 0 20)) :moment-list (list moment) :target-coords (list wrenches-tgt)))
+(print tau-tmp)
+
+#f(0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 -10.5202 0.762683 1.42023 10.3506 -0.044101 3.79712 2.261962e-16 0.0 0.0)
+#f(19.3192 0.0 0.0 0.0 0.0 0.0 0.0 0.0 5.41843 -10.8556 8.2437 -6.68211 0.358375 -1.50492 1.598970e-16 0.0 0.0)
