@@ -22,7 +22,7 @@
                       (let* ((drw (door-reaction-wrench (elt (send n :get :cds-info) 0) (make-coords) :door-weight 5))
                              (z (calc-torque-norm-gradient (car drw) (cadr drw) ;;(send n :get :contact-point)
                                                            (elt (send n :get :cds-info) 1)
-                                                           :link-list (send *pr2* :link-list (send (send n :get :contact-point) :parent)) :move-target (send n :get :contact-point) :use-base t)))
+                                                           :link-list (send *pr2* :link-list (send (send n :get :contact-point) :parent)) :move-target (send n :get :contact-point) :use-base nil)))
                         ;; (send *irtviewer* :viewer :viewsurface :line-width 4)
                         ;; (send *irtviewer* :viewer :viewsurface :color #f(1 0 0))
                         ;; (send *irtviewer* :viewer :draw-arrow 
@@ -34,7 +34,7 @@
       :debug-view :no-message
       :rotation-axis nil
       :use-torso t
-      :use-base t
+      :use-base nil
       :base-range (list :min (float-vector -100 -100 -20)
                         :max (float-vector 100 100  20))
       )

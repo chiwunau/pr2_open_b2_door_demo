@@ -86,7 +86,7 @@
 
     (setq pt2 (make-cascoords :coords (send (elt (send *pr2* arm :links) 3) :copy-worldcoords)))
     (send pt2 :translate #f(-70 0 -70))
-    (send (elt (send *pr2* arm :links) 3) :assoc pt2)
+    (send (elt (send *pr2* arm :links) 2) :assoc pt2) ;;; previously 3, 2 is supposedly correct
 
     (push pt0 *contact-pts*)
     (push pt1 *contact-pts*)

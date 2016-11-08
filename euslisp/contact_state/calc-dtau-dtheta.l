@@ -18,6 +18,7 @@
    (cond
      (use-base
       (setq ll (car *link-list-with-virtual-link*))
+      (setq *ll* ll)
       (setq dtau/dq (calc-torque-gradient force moment wrenches-cds :link-list ll :move-target move-target :use-base use-base))
       (setq tau (instantiate float-vector (reduce '+ (send-all (send-all ll :joint) :joint-dof))));(length ll)))
       (setq z (instantiate float-vector (reduce '+ (send-all (send-all ll :joint) :joint-dof))))
@@ -40,6 +41,7 @@
 
      (t
       (setq ll link-list)
+      (setq *ll* ll)
       (setq dtau/dq (calc-torque-gradient force moment wrenches-cds :link-list ll :move-target move-target))
       (setq tau (instantiate float-vector (length ll)))
       (setq z (instantiate float-vector (length ll)))
@@ -74,11 +76,13 @@
    
   ;; (setq tmp-W #f(0 0 0 0 0 0 0 0 0 1 0))
    (if use-base 
-       (setq tmp-W #f(0 0 0 0 0 0 0 0 0 1 0))
-     (setq tmp-W #f(0 0 0 0 0 0 1 0)))
+       (setq tmp-W #f(0 0 0 0 1 0 0 0))
+     (setq tmp-W #f(0 1 0 0 0)))
 
 ;;   (print (reduce '+ (send-all (send-all ll :joint) :joint-dof)))
 ;   (print "----------------")
+   (print tau)
+   (format-array dtau/dq)
    (dotimes (i (reduce '+ (send-all (send-all ll :joint) :joint-dof)))
 ;;     (print (norm (scale (elt tau i) (matrix-row dtau/dq i))))
      ;; (setq z (v+ z (scale (* (elt tmp-W i) (elt tau i)) (matrix-row dtau/dq i)))))
