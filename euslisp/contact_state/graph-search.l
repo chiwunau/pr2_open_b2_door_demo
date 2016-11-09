@@ -29,9 +29,11 @@
               (send node :put :pose-idx k)
               (send node :put :pose (elt (elt (elt pose-seq i) j) k))
               (send node :put :base (elt (elt (elt base-seq i) j) k))
-              (send node :put :torque (elt (elt (elt torque-seq i) j) k))
               (send node :put :cds-info (elt (elt (elt cds-info-seq i) j) k)) ;;cds-on-plane, shift-cds, contact-pt-cds
-              (send node :put :overload? (overload-node? node door-weight))
+              (send node :put :torque (calc-node-torque node door-weight)) ;;calculate door torque in this weight, can be simplified (TODO) by simplily multifying
+              (send node :put :overload? (overload-node? node :ratio 1))
+
+;;              (send node :put :torque (elt (elt (elt torque-seq i) j) k))
 
               (push node (elt *sorted-nodes-by-graph-depth* j))
               (push node *all-node*)))))))
@@ -56,24 +58,27 @@
       (check-node-overload n door-weight)
       )))
 
-(defun overload-node? (n &optional (door-weight 2.5))
-  (let* ((force-cds (elt (send n :get :cds-info) 0))
-         ;;             (contact-pt (elt (send n :get :cds-info) 2))
-         (contact-pt (send n :get :contact-point))
-         (max-tq (send *pr2* :max-torque-vector))
-         (overload nil)
+(defun calc-node-torque (n &optional (door-weight 2.5))
+  (let* ((contact-pt (send n :get :contact-point))
          drw tq)
     (send *pr2* :angle-vector (send n :get :pose))
     (send *pr2* :move-to (send n :get :base) :world)
     (send *door* :hinge :joint-angle (send n :get :door-angle))
     
-    (setq drw (door-reaction-wrench force-cds contact-pt :door-weight door-weight))
-    (setq tq (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords (list contact-pt)))
+    (setq drw (door-reaction-wrench (elt (send n :get :cds-info) 0) (make-coords) :door-weight door-weight))
+    (let ((wrenches-tgt (make-cascoords :pos (copy-object (send contact-pt :worldpos)) :rot (copy-object (send (elt (send n :get :cds-info) 1) :worldrot)))))
+      (send (send contact-pt :parent) :assoc wrenches-tgt)
+      (setq tq (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords (list wrenches-tgt))))
+    tq))
+
+(defun overload-node? (n &key (ratio 1))
+  (let* ((max-tq (send *pr2* :max-torque-vector))
+         (overload nil)
+         (tq (send n :get :torque)))
     
     (dotimes (i (length max-tq))
-      (if (> 0 (- (abs (elt max-tq i)) (abs (elt tq i))))
+      (if (> 0 (- (* ratio (abs (elt max-tq i))) (abs (elt tq i))))
           (setq overload t)))
-
     overload))
 
 
