@@ -61,7 +61,7 @@
 
 (defclass extended-node
   :super node
-  :slots (arm contact-point-index contact-point graph-depth door-angle solved robot-pose robot-pose-optimized base-coords base-coords-optimized object-coords-index object-coords ik-target-coords torque overload? transitable-nodes intransitable-nodes))
+  :slots (arm contact-point-index contact-point contact-type graph-depth door-angle solved robot-pose robot-pose-optimized base-coords base-coords-optimized object-coords-index object-coords ik-target-coords torque overload? transitable-nodes intransitable-nodes))
 (defmethod extended-node
   (:transitable-nodes 
    ()
@@ -91,6 +91,8 @@
           (setq contact-point-index val))
          (:contact-point
           (setq contact-point val))
+         (:contact-type
+          (setq contact-type val))
          (:graph-depth
           (setq graph-depth val))
          (:door-angle
@@ -127,6 +129,8 @@
           contact-point-index)
          (:contact-point
           contact-point)
+         (:contact-type
+          contact-type)
          (:graph-depth
           graph-depth)
          (:door-angle

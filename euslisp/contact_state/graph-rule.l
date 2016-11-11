@@ -104,4 +104,4 @@
     (pqp-collision-check-objects (cdr (send *pr2* arm :links)) tmpl)))
 
 (defun get-node (name)
-  (elt *all-node* (position name (send-all *all-node* :name) :test 'equal)))
+  (elt *all-nodes* (position name (send-all *all-nodes* :name) :test 'equal)))

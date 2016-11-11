@@ -1,6 +1,6 @@
 (defclass door
   :super cascaded-link
-  :slots (end-coords l1 l2 l3 j1 j2 door-radius door-width door-thickness knob-height knob-radius front-touch-cds-list rear-touch-cds-list h-tgts-num v-tgts-num h-step v-step))
+  :slots (rear-knob-coords front-knob-coords end-coords l1 l2 l3 j1 j2 door-radius door-width door-thickness knob-height knob-radius front-touch-cds-list rear-touch-cds-list h-tgts-num v-tgts-num h-step v-step))
 
 (defmethod door
   (:init (door-radius knob-height knob-radius)
@@ -13,6 +13,8 @@
 	   (send b :set-color :red)
 	   (setq l3 (instance bodyset-link :init (make-cascoords) :bodies (list b) :name 'front-knob))
 	   (setq end-coords (make-cascoords :pos (float-vector 0 knob-radius 0)))
+           (setq front-knob-coords (make-cascoords :coords (send end-coords :copy-worldcoords) :name "front-knob-coords"))
+           (send l3 :assoc front-knob-coords)
 	   (send l3 :assoc end-coords)
 	   (send l3 :locate (float-vector (+ 25 (- (+ 50 (/ 25 2.0))))  (* -1 door-radius) knob-height))
 
@@ -21,7 +23,8 @@
            (send b :set-color :red)
            (setq l4 (instance bodyset-link :init (make-cascoords) :bodies (list b) :name 'rear-knob))
            (send l4 :locate (float-vector (+ 25 125 (- (+ 50 (/ 25 2.0))))  (* -1 door-radius) knob-height))
-
+           (setq rear-knob-coords (make-cascoords :pos (float-vector (+ 25 125 (- (+ 50 (/ 25 2.0))))  (+ (* -1 door-radius) knob-radius) knob-height) :name "rear-knob-coords"))
+           (send l4 :assoc rear-knob-coords)
            (send l3 :assoc l4)
 
 	   
@@ -62,6 +65,15 @@
            (send self :make-rear-touch-cds-list door-width knob-height h-tgts-num v-tgts-num)
 	   (send self :init-ending)
 	   self))
+
+  (:h-tgts-num
+   ()
+   h-tgts-num)
+
+  (:v-tgts-num
+   ()
+   v-tgts-num)
+
 
   (:make-front-touch-cds-list
    (door-width knob-height &optional (p 8) (q 8))
@@ -110,6 +122,14 @@
   (:get-rear-touch-cds-list
    ()
    rear-touch-cds-list)
+
+  (:rear-knob-coords
+   ()
+   rear-knob-coords)
+
+  (:front-knob-coords
+   ()
+   front-knob-coords)
   
   
   (:end-coords 
