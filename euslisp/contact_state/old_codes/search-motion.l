@@ -8,8 +8,8 @@
 (setq *filtered-right-samples* nil)
 (setq *graph-depth* 5) ;;door opening angle interpolation
 (setq *door-step* 20) ;;5*20=100deg
-(setq debugview-colli nil)
-(setq debugview-mintq nil)
+(setq debugview-colli nil);:no-message)
+(setq debugview-mintq nil);:no-message)
 
 
 
@@ -95,7 +95,7 @@
     ))
 
 (defun motion-generation ()
-  (let ((tgt-cds-list (reverse (send *door* :get-rear-touch-cds-list)))
+  (let ((tgt-cds-list (send *door* :get-rear-touch-cds-list)))
         pose-list
         base-cds-list
         torque-list
@@ -108,16 +108,16 @@
         res
         tgt-cds)
     
-    (dolist (arm (list :rarm :larm))
+    (dolist (arm (list :rarm));; :larm))
 ;;    (dolist (arm (list :larm))
       (setq *use-arm* arm)
       (set-contact-points arm)
-      (dolist (contact-pt *contact-pts*)
+      (dolist (contact-pt (list (elt *contact-pts* 0)))
         (setq torque-list-seq nil)
         (setq pose-list-seq nil)
         (setq base-cds-list-seq nil)
         (setq cds-info-list-seq nil)
-        (dotimes (i *graph-depth*)
+        (dotimes (i 1);;*graph-depth*)
           (setq torque-list nil)
           (setq pose-list nil)
           (setq base-cds-list nil)
@@ -135,10 +135,10 @@
                                    :collision-avoidance-link-pair (door-arm-base-collision-link-pair contact-pt)
                                    :avoid-collision-distance 50
                                    :avoid-collision-joint-gain 1.0
-                                   :avoid-collision-null-gain 100.0
+                                   :avoid-collision-null-gain 200.0
                                    :rotation-axis nil;;:z
                                    :use-torso t
-                                   :use-base 0.5
+                                   :use-base t
                                    :base-range (list :min (float-vector -500 -500 -90)
                                                      :max (float-vector 500 500  90))
                                    ;; :base-range (list :min (float-vector -150 0 -30)
@@ -146,31 +146,33 @@
                                    :warnp nil
                                    :debug-view debugview-colli
                                    ))
-                   (when nil ;;when collision with door clear, search motion that satisfy torque limit
+                   (when res ;;when collision with door clear, search motion that satisfy torque limit
                      (setq res (send *pr2* :inverse-kinematics tgt-cds
                                      :move-target contact-pt
                                      :link-list (send *pr2* :link-list (send contact-pt :parent))
-                                     :null-space #'(lambda () 
-                                                     (let* ((drw (door-reaction-wrench cds contact-pt))
-                                                           (z (calc-torque-norm-gradient (car drw) (cadr drw) (send contact-pt :copy-worldcoords) :link-list (send *pr2* :link-list (send contact-pt :parent)) :move-target contact-pt :use-base t)))
-                                                       (setq z (normalize-vector z))
-                                                       (scale -0.01 z)))
+                                   :collision-avoidance-link-pair (door-arm-base-collision-link-pair contact-pt)
+                                   :avoid-collision-distance 50
+                                   :avoid-collision-joint-gain 1.0
+                                   :avoid-collision-null-gain 200.0
+                                   :null-space #'(lambda ()
+                                                   (let* ((drw (door-reaction-wrench cds (make-coords) :door-weight 5))
+                                                          (z (calc-torque-norm-gradient (car drw) (cadr drw) ;;(send n :get :contact-point)
+                                                                                        tgt-cds
+                                                                                        :link-list (send *pr2* :link-list (send contact-pt :parent)) :move-target contact-pt :use-base t)))
+                                                     ;; (send *irtviewer* :viewer :viewsurface :line-width 4)
+                                                     ;; (send *irtviewer* :viewer :viewsurface :color #f(1 0 0))
+                                                     ;; (send *irtviewer* :viewer :draw-arrow 
+                                                     ;;       (send (send n :get :contact-point) :worldpos)
+                                                     ;;       (v+ (send (send n :get :contact-point) :worldpos) (scale 10 (car drw))))
+                                                     ;; (send *irtviewer* :viewer :flush)
+;;                                                     (print (incf *hoge*))
+                                                     (setq z (normalize-vector z))
+                                                     (scale -0.03 z)))
                                      :rotation-axis nil
                                      :use-torso t
                                      :use-base t
                                      :warnp nil
                                      :debug-view debugview-mintq
-;;                                      :additional-check #'(lambda ()
-;;                                                            (let* ((max-torque (send *pr2* :max-torque-vector))
-;;                                                                   (overload nil)
-;;                                                                   (drw (door-reaction-wrench cds contact-pt))
-;;                                                                   (torque (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords  (list contact-pt)))
-;;                                                                   )
-;;                                                              (dotimes (i (length max-torque))
-;;                                                                (if (> 0 (- (abs (elt max-torque i)) (abs (elt torque i))))
-;;                                                                    (setq overload t)))
-;; ;;                                                             (if (not overload) (print "All joint torque limit satisfied!"))
-;;                                                              (not overload)))
                                      )))
                    )
 
@@ -192,7 +194,7 @@
                                    :warnp nil
                                    :debug-view debugview-colli
                          ))
-                   (when nil
+                   (when res
                      (setq res (send *pr2* :inverse-kinematics tgt-cds
                                      :move-target contact-pt
                                      :link-list (send *pr2* :link-list (send contact-pt :parent))
@@ -227,7 +229,7 @@
               (push res pose-list)
               (push (list (send cds :copy-worldcoords) (send tgt-cds :copy-worldcoords) (send contact-pt :copy-worldcoords)) cds-info-list)
               )
-            (send *pr2* :move-to org-base-cds :world))
+;;            (send *pr2* :move-to org-base-cds :world))
           (push (reverse torque-list) torque-list-seq)
           (push (reverse base-cds-list) base-cds-list-seq)
           (push (reverse pose-list) pose-list-seq)
@@ -242,7 +244,7 @@
 
 (defun door-arm-collide
   ()
-  (pqp-collision-check-objects (send *pr2* *use-arm* :links) (send *door* :links))
+  (pqp-collision-check-objects (send *pr2* :links) (send *door* :links))
   )
 
 (defun door-base-collide

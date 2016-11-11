@@ -31,7 +31,7 @@
               (send node :put :base (elt (elt (elt base-seq i) j) k))
               (send node :put :cds-info (elt (elt (elt cds-info-seq i) j) k)) ;;cds-on-plane, shift-cds, contact-pt-cds
               (send node :put :torque (calc-node-torque node door-weight)) ;;calculate door torque in this weight, can be simplified (TODO) by simplily multifying
-              (send node :put :overload? (overload-node? node :ratio 1))
+              (send node :put :overload? (overload-node? node :ratio 1.0))
 
 ;;              (send node :put :torque (elt (elt (elt torque-seq i) j) k))
 
@@ -71,7 +71,7 @@
       (setq tq (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords (list wrenches-tgt))))
     tq))
 
-(defun overload-node? (n &key (ratio 1))
+(defun overload-node? (n &key (ratio 1.0))
   (let* ((max-tq (send *pr2* :max-torque-vector))
          (overload nil)
          (tq (send n :get :torque)))
@@ -138,11 +138,4 @@
   (send *graph* :goal-state (send *graph* :node "end"))
 )
 
-(defun play-node (n)
-  (send *pr2* :angle-vector (send n :get :pose))
-  (send *pr2* :move-to (send n :get :base) :world)
-  (send *door* :hinge :joint-angle (send n :get :door-angle))
-  (send *irtviewer* :draw-objects :flush t)
-  (send *pr2* :draw-torque (send *irtviewer* :viewer) :torque-vector (scale 5 (send n :get :torque)))
-  (send *irtviewer* :viewer :viewsurface :flush))
               

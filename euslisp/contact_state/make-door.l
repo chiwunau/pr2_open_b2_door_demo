@@ -1,6 +1,6 @@
 (defclass door
   :super cascaded-link
-  :slots (end-coords l1 l2 l3 j1 j2 door-radius door-width door-thickness knob-height knob-radius front-touch-cds-list rear-touch-cds-list))
+  :slots (end-coords l1 l2 l3 j1 j2 door-radius door-width door-thickness knob-height knob-radius front-touch-cds-list rear-touch-cds-list h-tgts-num v-tgts-num h-step v-step))
 
 (defmethod door
   (:init (door-radius knob-height knob-radius)
@@ -55,8 +55,11 @@
 	   
 	   (setq links (list l1 l2 l3 l4 l5))
 	   (setq joint-list (list j1 j2))
-           (send self :make-front-touch-cds-list door-width knob-height)
-           (send self :make-rear-touch-cds-list door-width knob-height)
+
+           (setq h-tgts-num 2)
+           (setq v-tgts-num 2)
+           (send self :make-front-touch-cds-list door-width knob-height h-tgts-num v-tgts-num)
+           (send self :make-rear-touch-cds-list door-width knob-height h-tgts-num v-tgts-num)
 	   (send self :init-ending)
 	   self))
 
@@ -76,31 +79,30 @@
          (send (send (send self :end-coords :parent) :parent) :assoc cds)
          (push cds cds-list)))
      (setq front-touch-cds-list cds-list)
+     (setq front-touch-cds-list (reverse front-touch-cds-list))
      cds-list))
 
   (:make-rear-touch-cds-list
    (door-width knob-height &optional (p 8) (q 8))
-;;   (door-width knob-height &optional (p 3) (q 3))
    (let (cds-list
-         cds
-         ;; (y-step (/ (/ door-width 2) p))
-         ;; (z-step (/ (/ knob-height 2) q)))
-         (y-step (/ (/ door-width 1.5) p))
-         (y-offset 20) ;;avoid too close to door edge
-         (z-step (/ (/ knob-height 1.5) q)))
+         cds)
+     ;; (y-step (/ (/ door-width 2) p))
+     ;; (z-step (/ (/ knob-height 2) q)))
+     (setq h-step (/ (/ door-width 1.5) p))
+     (setq h-offset 20) ;;avoid too close to door edge
+     (setq v-step (/ (/ knob-height 1.5) q))
      (dotimes (i p)  
        (dotimes (j q)
          (setq cds (make-cascoords))
-          (send cds :translate (float-vector (+ 10 door-thickness) (- door-width) (* 1.25 knob-height)))
-          (send cds :translate (float-vector 0 (+ (* i y-step) y-offset) (- (* j z-step))))
-          (send (send (send self :end-coords :parent) :parent) :assoc cds)
-          (push cds cds-list)))
+         (send cds :translate (float-vector (+ 10 door-thickness) (- door-width) (* 1.25 knob-height)))
+         (send cds :translate (float-vector 0 (+ (* i h-step) h-offset) (- (* j v-step))))
+         (send (send (send self :end-coords :parent) :parent) :assoc cds)
+         (push cds cds-list)))
      (setq rear-touch-cds-list cds-list)
+     (setq rear-touch-cds-list (reverse rear-touch-cds-list))
      cds-list))
 
 
-  
-  
   (:get-front-touch-cds-list
    ()
    front-touch-cds-list)
