@@ -61,7 +61,7 @@
 
 (defclass extended-node
   :super node
-  :slots (arm contact-point-index contact-point contact-type graph-depth door-angle solved robot-pose robot-pose-optimized base-coords base-coords-optimized object-coords-index object-coords ik-target-coords torque overload? transitable-nodes intransitable-nodes))
+  :slots (arm islands contact-point-index contact-point contact-type graph-depth door-angle solved robot-pose robot-pose-optimized base-coords base-coords-optimized object-coords-index object-coords ik-target-coords torque overload? transitable-nodes intransitable-nodes))
 (defmethod extended-node
   (:transitable-nodes 
    ()
@@ -87,6 +87,8 @@
    (case key
          (:arm
           (setq arm val))
+         (:islands ;;for mutiple point contact
+          (setq islands val))
          (:contact-point-index
           (setq contact-point-index val))
          (:contact-point
@@ -125,6 +127,8 @@
    (case key
          (:arm
           arm)
+         (:islands ;;for mutiple point contact
+          islands)
          (:contact-point-index
           contact-point-index)
          (:contact-point

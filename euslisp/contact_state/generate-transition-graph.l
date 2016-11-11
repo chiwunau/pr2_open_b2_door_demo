@@ -1,4 +1,4 @@
-(defun init-graph (&key (nodes *all-nodes*))
+(defun init-graph (&key (nodes *solvable-nodes*) (bridge-nodes *bridge-nodes*))
   (let ((start-node (instance extended-node :init "start"))
         (goal-node (instance extended-node :init "goal"))
         (graph (instance costed-graph :init)))
@@ -12,10 +12,11 @@
 
 ;;   ;;add nodes to graph
   (dolist (n nodes)
-;    (unless (send n :get-value :overload?)
-      (send graph :add-node n))
-
-;;   ;;add arcs to graph
+    (send graph :add-node n))
+  (dolist (n bridge-nodes)
+    (send graph :add-node n))
+            
+  ;;init single point contact nodes
   (dotimes (depth (- *graph-depth* 1))
     (let ((ns1 (extract-nodes-by-depth depth :nodes nodes))
           (ns2 (extract-nodes-by-depth (+ depth 1) :nodes nodes)))
@@ -44,6 +45,12 @@
                           (calc-distance-between-pose (send n1 :get-value :robot-pose) (send n2 :get-value :robot-pose) (send n1 :get-value :base-coords) (send n2 :get-value :base-coords)) ;;cost of arc
                     :both nil))
                 ))))))))
+
+  (dolist (n *bridge-nodes*)
+    (when (and (member (car (send n :get-value :islands)) (send graph :nodes)) (member (cadr (send n :get-value :islands)) (send graph :nodes)))
+      (send graph :add-arc (car (send n :get-value :islands)) n 1 :both t)
+      (send graph :add-arc (cadr (send n :get-value :islands)) n 1 :both t)))
+
    (setq *graph* graph)
    (set-start-goal-state)
   ))
