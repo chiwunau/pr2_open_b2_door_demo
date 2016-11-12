@@ -36,7 +36,7 @@ def draw():
             c = i + 1
         else:
             plt.subplot(4,2,8)
-            plt.ylim([0, 5 + max(max(tq_data[i]), max_tq[i])])
+            plt.ylim([0, 1 + max(tq_data[i])])
             plt.ylabel('Absolute joint torque [Nm]')
             plt.xlabel('calculation loop count')
             plt.plot(map(abs,tq_data[i]), "k")

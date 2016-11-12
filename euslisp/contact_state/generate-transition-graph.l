@@ -37,9 +37,7 @@
           ;; (when (and (not (send n1 :get-value :overload?)) (not (send n2 :get-value :overload?)) (equal (send n1 :get-value :arm) (send n2 :get-value :arm)))
               (cond 
                ((and (equal (send n1 :get-value :arm) (send n2 :get-value :arm)) (equal (send n1 :get-value :contact-point) (send n2 :get-value :contact-point)))
-               ;; ((equal (send n1 :get-value :arm) (send n2 :get-value :arm))
 
-;                (print (transitable? n1 n2))
                 (if (transitable? n1 n2)
                     (send graph :add-arc n1 n2
                           (calc-distance-between-pose (send n1 :get-value :robot-pose) (send n2 :get-value :robot-pose) (send n1 :get-value :base-coords) (send n2 :get-value :base-coords)) ;;cost of arc
@@ -48,8 +46,8 @@
 
   (dolist (n *bridge-nodes*)
     (when (and (member (car (send n :get-value :islands)) (send graph :nodes)) (member (cadr (send n :get-value :islands)) (send graph :nodes)))
-      (send graph :add-arc (car (send n :get-value :islands)) n 1 :both t)
-      (send graph :add-arc (cadr (send n :get-value :islands)) n 1 :both t)))
+      (send graph :add-arc (car (send n :get-value :islands)) n 0 :both t)
+      (send graph :add-arc (cadr (send n :get-value :islands)) n 0 :both t)))
 
    (setq *graph* graph)
    (set-start-goal-state)
@@ -60,7 +58,7 @@
     (:hn (n p)
        0.0))
   (setq *solver* (instance a*-graph-search-solver :init *graph*))
-  (setq *path* (send *solver* :solve *graph* :verbose nil))
+  (setq *path* (send *solver* :solve *graph* :verbose t))
   (let ((pa (reverse (cdr (reverse (cdr *path*))))))
     (setq *m* (list (send-all (send-all pa :state) :get-value :robot-pose) (send-all (send-all pa :state) :get-value :base-coords) (send *pr2* :max-torque-vector)))
     ))
