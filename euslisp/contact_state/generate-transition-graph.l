@@ -3,17 +3,16 @@
         (goal-node (instance extended-node :init "goal"))
         (graph (instance costed-graph :init)))
     
-;;     (send-all nodes :remove-all-arcs)
+    (send-all nodes :remove-all-arcs)
+    (send-all bridge-nodes :remove-all-arcs)
 ;;     ;; (send start-node :remove-all-arcs)
 ;;     ;; (send goal-node :remove-all-arcs)
     
-  (send graph :add-node start-node)
-  (send graph :add-node goal-node)
+    (send graph :add-node start-node)
+    (send graph :add-node goal-node)
 
 ;;   ;;add nodes to graph
   (dolist (n nodes)
-    (send graph :add-node n))
-  (dolist (n bridge-nodes)
     (send graph :add-node n))
             
   ;;init single point contact nodes
@@ -45,9 +44,12 @@
                 ))))))))
 
   (dolist (n *bridge-nodes*)
-    (when (and (member (car (send n :get-value :islands)) (send graph :nodes)) (member (cadr (send n :get-value :islands)) (send graph :nodes)))
-      (send graph :add-arc (car (send n :get-value :islands)) n 0 :both t)
-      (send graph :add-arc (cadr (send n :get-value :islands)) n 0 :both t)))
+    (let ((ri (get-node (car (send n :get-value :islands))))
+          (li (get-node (cadr (send n :get-value :islands)))))
+      (when (and (member ri (send graph :nodes)) (member li (send graph :nodes)))
+        (send graph :add-node n)
+        (send graph :add-arc ri n 0 :both t)
+        (send graph :add-arc li n 0 :both t))))
 
    (setq *graph* graph)
    (set-start-goal-state)

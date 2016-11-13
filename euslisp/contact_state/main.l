@@ -9,6 +9,7 @@
 (load "extended-irtmodel.l")
 (load "extended-graph.l")
 (load "calc-dtau-dtheta.l")
+(load "write-load-data.l")
 
 ;;(load "graph-search.l")
 

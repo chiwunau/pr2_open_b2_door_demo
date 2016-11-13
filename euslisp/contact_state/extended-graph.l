@@ -22,9 +22,20 @@
                       (dolist (target-node nodes)
                         (format f "   ")
                         ;; hoge = "hoge";                 
+                        ;; (format f "~A [label = \"~A\"];~%"
+                        ;;         (graphviz-node-name target-node)
+                        ;;         (send target-node :name))
                         (format f "~A [label = \"~A\"];~%"
                                 (graphviz-node-name target-node)
-                                (send target-node :name))
+                                (if (send target-node :get-value :islands)
+                                    (let ((a (car (send target-node :get-value :islands)))
+                                          (b (cadr (send target-node :get-value :islands))))
+                                      ;; (format nil "~A\\n~A" a b))
+                                      (format nil "bridge"))
+                                  (send target-node :name)))
+                        (if (send target-node :get-value :islands)
+                            (format f "~A [style = dotted];~%"
+                                    (graphviz-node-name target-node)))
                         )
                       ;; first of all, write result-path
                       (let ((drawed-arc nil))
@@ -61,7 +72,7 @@
 
 (defclass extended-node
   :super node
-  :slots (arm islands contact-point-index contact-point contact-type graph-depth door-angle solved robot-pose robot-pose-optimized base-coords base-coords-optimized object-coords-index object-coords ik-target-coords torque overload? transitable-nodes intransitable-nodes))
+  :slots (arm islands contact-point-index contact-point contact-type graph-depth door-angle solved robot-pose robot-pose-optimized base-coords base-coords-optimized object-coords-index object-coords ik-target-coords torque torque-optimized overload? transitable-nodes intransitable-nodes))
 (defmethod extended-node
   (:transitable-nodes 
    ()
@@ -117,6 +128,8 @@
           (setq ik-target-coords val))
          (:torque
           (setq torque val))
+         (:torque-optimized
+          (setq torque-optimized val))
          (:overload?
           (setq overload? val))
          )
@@ -157,6 +170,8 @@
           ik-target-coords)
          (:torque
           torque)
+         (:torque-optimized
+          torque-optimized)
          (:overload?
           overload?)
          )

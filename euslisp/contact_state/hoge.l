@@ -141,17 +141,17 @@ all-node, 787 nodes
 
 
 
-
-
-(let* ((f (open (format nil "2016-11-12/norm-ratio.txt")
+(let* ((f (open (format nil "2016-11-13/norm-ratio.txt")
                 :direction :output
                 :if-exists :new-version
                 :if-does-not-exist :create)))
-  
-  (dotimes (i (length tau-list))
-    (if (elt opt-tau-list i)
-        (format f "~A~%" (/ (norm (elt opt-tau-list i)) (norm (elt tau-list i))))
-      (format f "~A~%" 0)))
+
+  (dolist (n *solvable-nodes*)
+    (unless (send n :get-value :islands)
+      (let ((tau (calc-robot-torque n :optimized nil :door-weight 5))
+            (opt-tau (if (send n :get-value :robot-pose-optimized) (calc-robot-torque n :optimized t :door-weight 5) nil)))
+        (when opt-tau
+          (format f "~A~%" (/ (norm opt-tau) (norm tau)))))))
   (close f)
   )
 ;;--------------------------------------plot optimized torque comparision--------------------------------------------;;
@@ -161,17 +161,23 @@ all-node, 787 nodes
           (opt-tau (if (send n :get-value :robot-pose-optimized) (calc-robot-torque n :optimized t :door-weight 5) nil)))
 
       (let* ((name "norm")
-             (new1? (not (probe-file (format nil "2016-11-12/_~A_~A_org.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name))))
-             (new2? (not (probe-file (format nil "2016-11-12/_~A_~A_opt.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name))))
-             (f1 (open (format nil "2016-11-12/_~A_~A_org.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name)
+             (new1? (not (probe-file (format nil "2016-11-13/_~A_~A_org.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name))))
+             (new2? (not (probe-file (format nil "2016-11-13/_~A_~A_opt.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name))))
+             (new3? (not (probe-file (format nil "2016-11-13/_~A_norm_ratio.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r)))))
+                    
+             (f1 (open (format nil "2016-11-13/_~A_~A_org.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name)
                        :direction :output
                        :if-exists :append
                        :if-does-not-exist :create))
-             (f2 (open (format nil "2016-11-12/_~A_~A_opt.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name)
+             (f2 (open (format nil "2016-11-13/_~A_~A_opt.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name)
+                       :direction :output
+                       :if-exists :append
+                       :if-does-not-exist :create))
+             (f3 (open (format nil "2016-11-13/_~A_norm_ratio.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r))
                        :direction :output
                        :if-exists :append
                        :if-does-not-exist :create)))
-             
+
              (when new1?
                (format f1 "~A~%" name)
                (format f1 "~A~%" 0))
@@ -180,20 +186,23 @@ all-node, 787 nodes
                (format f2 "~A~%" 0))
              (when opt-tau
                (format f1 "~A~%" (norm tau))
-               (format f2 "~A~%" (norm opt-tau)))
+               (format f2 "~A~%" (norm opt-tau))
+               (format f3 "~A~%" (/ (norm opt-tau) (norm tau))))
 
              (close f1)
-             (close f2))
+             (close f2)
+             (close f3)
+             )
       
       (dotimes (i 7)
         (let* ((name (send (elt (send *pr2* :joint-list) (if (equal :larm (send n :get-value :arm)) (+ 1 i) (+ 8 i))) :name))
-               (new1? (not (probe-file (format nil "2016-11-12/~A_~A_org.txt" i name))))
-               (new2? (not (probe-file (format nil "2016-11-12/~A_~A_opt.txt" i name))))
-               (f1 (open (format nil "2016-11-12/~A_~A_org.txt" i name)
+               (new1? (not (probe-file (format nil "2016-11-13/~A_~A_org.txt" i name))))
+               (new2? (not (probe-file (format nil "2016-11-13/~A_~A_opt.txt" i name))))
+               (f1 (open (format nil "2016-11-13/~A_~A_org.txt" i name)
                         :direction :output
                         :if-exists :append
                         :if-does-not-exist :create))
-               (f2 (open (format nil "2016-11-12/~A_~A_opt.txt" i name)
+               (f2 (open (format nil "2016-11-13/~A_~A_opt.txt" i name)
                         :direction :output
                         :if-exists :append
                         :if-does-not-exist :create)))
