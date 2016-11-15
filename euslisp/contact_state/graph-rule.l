@@ -1,6 +1,4 @@
-(load "~/ros/hydro/src/jsk-ros-pkg/euslib/rbrain/virtual_interpolator.l")
-
-(setq *cof-p* 0.3)
+(setq *cof-p* 0.0)
 (defun calc-distance-between-pose
   (p1 p2 b1 b2) ;;pose1(reccent) pose2(next) base1(reccent) base2(next)
   (let* ((cof-p *cof-p*)

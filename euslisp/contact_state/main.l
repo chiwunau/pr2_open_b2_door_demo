@@ -10,7 +10,7 @@
 (load "extended-graph.l")
 (load "calc-dtau-dtheta.l")
 (load "write-load-data.l")
-
+(load "~/ros/hydro/src/jsk-ros-pkg/euslib/rbrain/virtual_interpolator.l")
 ;;(load "graph-search.l")
 
 (defun init()
@@ -43,7 +43,10 @@
 
 (defun test-graph()
   (init)
-  (load "data/motion-data-2016-10-13.dat")
-  (filter-samples)
-  (init-all-node :door-weight 0.0)
+  (load "data/nodes-data-2016-11-12-long-ver2.dat")
+  (update-loaded-nodes)
+  (get-solvable-nodes)
+  (init-start-nodes)
+  (robot-pose-sampling :nodes *start-nodes*)
+  (init-nodes-torque-info :door-weight 5)
   (bench (init-graph)))

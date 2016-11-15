@@ -33,16 +33,30 @@
             (when (member n2 (send graph :nodes))
               (if (and (not (member goal-node (send n2 :neighbors))) (equal (send n2 :get-value :graph-depth) (- *graph-depth* 1))) ;;add end node
                     (send graph :add-arc n2 goal-node 1 :both nil))
-          ;; (when (and (not (send n1 :get-value :overload?)) (not (send n2 :get-value :overload?)) (equal (send n1 :get-value :arm) (send n2 :get-value :arm)))
+          (when (and (not (send n1 :get-value :overload?)) (not (send n2 :get-value :overload?)))
               (cond 
+               ((or (eq (send n1 :get-value :contact-type) 'grasp) (eq (send n2 :get-value :contact-type) 'grasp)) ;;when either node is grasp knob
+                (if (and (equal (send n1 :get-value :object-coords-index) (send n2 :get-value :object-coords-index)) (equal (send n1 :get-value :arm) (send n2 :get-value :arm)))
+                    (send graph :add-arc n1 n2
+                          (calc-distance-between-pose 
+                           (if (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :robot-pose))
+                           (if (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :robot-pose))
+                           (if (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :base-coords-optimized) (send n1 :get-value :base-coords))
+                           (if (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :base-coords-optimized) (send n2 :get-value :base-coords)))
+                          :both nil)))
                ((and (equal (send n1 :get-value :arm) (send n2 :get-value :arm)) (equal (send n1 :get-value :contact-point) (send n2 :get-value :contact-point)))
-
                 (if (transitable? n1 n2)
                     (send graph :add-arc n1 n2
-                          (calc-distance-between-pose (send n1 :get-value :robot-pose) (send n2 :get-value :robot-pose) (send n1 :get-value :base-coords) (send n2 :get-value :base-coords)) ;;cost of arc
-                    :both nil))
-                ))))))))
+                          (calc-distance-between-pose 
+                           (if (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :robot-pose))
+                           (if (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :robot-pose))
+                           (if (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :base-coords-optimized) (send n1 :get-value :base-coords))
+                           (if (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :base-coords-optimized) (send n2 :get-value :base-coords)))
+                          :both nil))
+                )
+              ))))))))
 
+  (clear-zero-relation-nodes graph)
   (dolist (n *bridge-nodes*)
     (let ((ri (get-node (car (send n :get-value :islands))))
           (li (get-node (cadr (send n :get-value :islands)))))
@@ -51,19 +65,26 @@
         (send graph :add-arc ri n 0 :both t)
         (send graph :add-arc li n 0 :both t))))
 
-   (setq *graph* graph)
-   (set-start-goal-state)
+  (when (member (get-node "r-0-0-fk") (send graph :nodes))
+    (send graph :add-node (car *start-nodes*))
+    (send graph :add-arc (car *start-nodes*) (get-node "r-0-0-fk") 0 :both nil))
+
+  (when (member (get-node "l-0-0-fk") (send graph :nodes))
+    (send graph :add-node (cadr *start-nodes*))
+    (send graph :add-arc (cadr *start-nodes*) (get-node "l-0-0-fk") 0 :both nil))
+
+  (setq *graph* graph)
+  (set-start-goal-state)
   ))
 
 (defun solve-graph ()
   (defmethod a*-graph-search-solver
     (:hn (n p)
        0.0))
-  (setq *solver* (instance a*-graph-search-solver :init *graph*))
-  (setq *path* (send *solver* :solve *graph* :verbose t))
-  (let ((pa (reverse (cdr (reverse (cdr *path*))))))
-    (setq *m* (list (send-all (send-all pa :state) :get-value :robot-pose) (send-all (send-all pa :state) :get-value :base-coords) (send *pr2* :max-torque-vector)))
-    ))
+  ;; (setq *solver* (instance a*-graph-search-solver :init *graph*))
+  (setq *solver* (instance depth-first-graph-search-solver))
+  (setq *path* (send *solver* :solve *graph* :verbose nil))
+  )
 
 (defun extract-nodes-by-depth (depth &key (nodes *all-nodes*))
   (let (rect-nodes)
@@ -73,6 +94,84 @@
      (reverse rect-nodes)))
 
 (defun set-start-goal-state ()
-  (send *graph* :start-state (send *graph* :node "start"))
+ (send *graph* :start-state (send *graph* :node "start"))
   (send *graph* :goal-state (send *graph* :node "goal"))
+  ;; (send *graph* :start-state (send *graph* :node "r-0-1-3"))
+  ;; (send *graph* :goal-state (send *graph* :node "l-0-0-fk"))
 )
+
+
+(defun clear-zero-relation-nodes (&optional (g *graph*))
+  (let (childs)
+    (dolist (n (send g :nodes))
+      (dolist (nb (send n :neighbors))
+        (unless (member nb childs)
+          (push nb childs))))
+    
+    (dolist (n (send g :nodes))
+      (when (and (not (send n :arc-list)) (not (member n childs)))
+        (send g :remove-node n))))
+)
+
+(defun play-path (&optional (p *path*) (t-inv 300))
+  (let ((ns (send-all p :state))
+        (c 0))
+    (dolist (n ns)
+      (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
+        (print n)
+        (if (send n :get-value :robot-pose-optimized)
+            (play-node n :optimized t)
+          (play-node n))
+;;        (send *irtviewer* :viewer :viewsurface :write-to-image-file (format nil "~A_~A" c (send n :name)))
+        (incf c)
+        (unix:usleep (* 1000 t-inv))))))
+       
+
+(defun execute-robot-motion (&optional (p *path*))
+  (let ((t-interval 5000.0) ;msec
+        (ns (send-all p :state))
+        avs
+        base-cds-list
+        traj-points
+        diff-v
+        diff-cds
+        sttm)
+
+    (dolist (n ns)
+      (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
+        (if (send n :get-value :robot-pose-optimized)
+            (progn (push (send n :get-value :robot-pose-optimized) avs)
+                   (push (send n :get-value :base-coords-optimized) base-cds-list))
+          (progn (push (send n :get-value :robot-pose) avs)
+                 (push (send n :get-value :base-coords) base-cds-list)))))
+
+    (setq avs (reverse avs))
+    (setq base-cds-list (reverse base-cds-list))
+          
+    (send *pr2* :move-to (elt base-cds-list 0) :world)
+    (dotimes (i (length base-cds-list))
+      ;; (if (= i 0)
+          (setq diff-cds (send (send *pr2* :copy-worldcoords) :transformation (elt base-cds-list i)))
+        ;; (setq diff-cds (send (elt base-cds-list (- i 1)) :transformation (elt base-cds-list i))))
+          (setq diff-v (send diff-cds :pos))
+          (push (float-vector (elt diff-v 0)
+                              (elt diff-v 1)
+                              (vector-angle #f(1 0 0) (matrix-column (send diff-cds :worldrot) 0) #f(0 0 1)))
+                              traj-points))
+
+    (send *ri* :angle-vector (car avs) 1000)
+    (unix::usleep (* 1000 1000))
+;;    (send *ri* :wait-interpolation)
+    (setq sttm (ros::time+ (ros::time-now) (ros::time 2)))
+    (setq *traj-points* traj-points)
+    (setq *base-cds-list* base-cds-list)
+    (setq *avs* avs)
+
+    (send *ri* :angle-vector-sequence avs (list t-interval) :default-controller sttm)
+    (print "check")
+    (send *ri* :move-trajectory-sequence 
+          (reverse traj-points)
+          (make-list (length base-cds-list) :initial-element t-interval)
+          :start-time sttm
+          :send-action t)
+    ))

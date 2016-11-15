@@ -19,32 +19,40 @@
                      (with-open-file 
                       (f fname :direction :output)
                       (format f "digraph ~A {~%" title)
+;;                     (format f "size = \"8.3, 11.7\";~%")
+                      (format f "ratio = ~A;~%" (/ 8.3 11.7))
+                       ;; (format f "ratio = 1;~%")
+                     ;; (format f "ranksep = \"3.0 equally\";~%")
+                     (format f "nodesep = 0.05;~%")
+
                       (dolist (target-node nodes)
                         (format f "   ")
                         ;; hoge = "hoge";                 
                         ;; (format f "~A [label = \"~A\"];~%"
                         ;;         (graphviz-node-name target-node)
                         ;;         (send target-node :name))
-                        (format f "~A [label = \"~A\"];~%"
-                                (graphviz-node-name target-node)
-                                (if (send target-node :get-value :islands)
-                                    (let ((a (car (send target-node :get-value :islands)))
-                                          (b (cadr (send target-node :get-value :islands))))
-                                      ;; (format nil "~A\\n~A" a b))
-                                      (format nil "bridge"))
-                                  (send target-node :name)))
-                        (if (send target-node :get-value :islands)
-                            (format f "~A [style = dotted];~%"
+                        (unless (send target-node :get-value :islands)
+                          (format f "~A [label = \"~A\"];~%"
+                                  (graphviz-node-name target-node)
+                                  ;; (if (send target-node :get-value :islands)
+                                  ;;     (let ((a (car (send target-node :get-value :islands)))
+                                  ;;           (b (cadr (send target-node :get-value :islands))))
+                                  ;;       ;; (format nil "~A\\n~A" a b))
+                                  ;;       (format nil "bridge"))
+                                  (send target-node :name))
+                        (if (member target-node (send-all result-path :state))
+                            (format f "~A [color =red];~%"
                                     (graphviz-node-name target-node)))
+                        )
                         )
                       ;; first of all, write result-path
                       (let ((drawed-arc nil))
-                        (let (anode)
-                          (while (and (setq anode (pop result-path)) result-path)
-                            (format f "   ")
-                            (format f "~A -> ~A [color = red];~%"
-                                    (graphviz-node-name (send anode :state))
-                                    (graphviz-node-name (send (car result-path) :state)))))
+                        ;; (let (anode)
+                        ;;   (while (and (setq anode (pop result-path)) result-path)
+                        ;;     (format f "   ")
+                        ;;     (format f "~A -> ~A [color = red];~%"
+                        ;;             (graphviz-node-name (send anode :state))
+                        ;;             (graphviz-node-name (send (car result-path) :state)))))
                         (dolist (target-node nodes)
                           (let ((neighbors
                                  (mapcar #'cdr (send self :successors target-node))))
@@ -52,22 +60,71 @@
                               (when (not (or (find (cons target-node neighbor) drawed-arc
                                                    :test #'equal)
                                              (find (cons neighbor target-node) drawed-arc
-                                                   :test #'equal)))
+                                                   :test #'equal)
+                                             (and (send target-node :get-value :islands)
+                                                  (or (find (cons (send self :node (car (send target-node :get-value :islands))) (send self :node (cadr (send target-node :get-value :islands)))) drawed-arc
+                                                        :test #'equal)
+                                                      (find (cons (send self :node (cadr (send target-node :get-value :islands))) (send self :node (car (send target-node :get-value :islands)))) drawed-arc
+                                                            :test #'equal)))
+                                             (send neighbor :get-value :islands)
+                                             ))
                                 (if (member target-node
-                                            (mapcar #'cdr (send self :successors neighbor)))
+                                            (mapcar #'cdr (send self :successors neighbor))) ;;both arc
                                     (progn
                                       (format f "   ")
-                                      (format f "~A -> ~A [dir = both];~%"
-                                              (graphviz-node-name target-node)
-                                              (graphviz-node-name neighbor)))
+                                      (cond 
+                                       ((send target-node :get-value :islands)
+                                        (if (member target-node (send-all result-path :state))
+                                            (if (< (position (send self :node (car (send target-node :get-value :islands))) (send-all result-path :state)) (position (send self :node (cadr (send target-node :get-value :islands))) (send-all result-path :state)))
+                                                (format f "~A -> ~A [color = red, style = dashed];~%"
+                                                        (graphviz-node-name (send self :node (car (send target-node :get-value :islands))))
+                                                        (graphviz-node-name (send self :node (cadr (send target-node :get-value :islands)))))
+                                              (format f "~A -> ~A [color = red, style = dashed];~%"
+                                                      (graphviz-node-name (send self :node (cadr (send target-node :get-value :islands))))
+                                                      (graphviz-node-name (send self :node (car (send target-node :get-value :islands))))))
+                                          (format f "~A -> ~A [dir = both, color = green, style = dashed];~%"
+                                                  (graphviz-node-name (send self :node (car (send target-node :get-value :islands))))
+                                                  (graphviz-node-name (send self :node (cadr (send target-node :get-value :islands))))))
+                                        (push (cons (send self :node (car (send target-node :get-value :islands))) (send self :node (cadr (send target-node :get-value :islands)))) drawed-arc))
+                                       ((and (member target-node (send-all result-path :state)) (member neighbor (send-all result-path :state)) (eq 1 (abs (- (position target-node (send-all result-path :state)) (position neighbor (send-all result-path :state))))))
+                                            (if (< (position target-node (send-all result-path :state)) (position neighbor (send-all result-path :state)))
+                                                (format f "~A -> ~A [style = bold, color = red];~%"
+                                                        (graphviz-node-name target-node)
+                                                        (graphviz-node-name neighbor))
+                                              (format f "~A -> ~A [style = bold, color = red];~%"
+                                                      (graphviz-node-name neighbor)
+                                                      (graphviz-node-name target-node)))
+                                            (push (cons target-node neighbor) drawed-arc))
+                                       (t
+                                        (format f "~A -> ~A [dir = both];~%"
+                                                  (graphviz-node-name target-node)
+                                                  (graphviz-node-name neighbor))
+                                        (push (cons target-node neighbor) drawed-arc))))
                                   (progn
                                     (format f "   ")
-                                    (format f "~A -> ~A;~%"
-                                            (graphviz-node-name target-node)
-                                            (graphviz-node-name neighbor))))
-                                (push (cons target-node neighbor) drawed-arc)))))
+                                    (if (and (member target-node (send-all result-path :state)) (member neighbor (send-all result-path :state)) (eq 1 (abs (- (position target-node (send-all result-path :state)) (position neighbor (send-all result-path :state))))))
+                                        (format f "~A -> ~A [style = bold, color = red];~%"
+                                                (graphviz-node-name target-node)
+                                                (graphviz-node-name neighbor))
+                                      (format f "~A -> ~A;~%"
+                                              (graphviz-node-name target-node)
+                                              (graphviz-node-name neighbor)))
+                                    (push (cons target-node neighbor) drawed-arc)))
+                                
+                                ))))
                         (format f "}~%")
                         t)))))
+  ;; (:write-to-pdf
+  ;;  (fname &optional (title "default_title") result-path)
+  ;;  (let ((dot-fname
+  ;;         (format nil "~A.dot" fname)))
+  ;;    (send self :write-to-dot dot-fname result-path title)
+  ;;    (unix::system (format nil "dot -Tpdf ~a -o ~a-dot.pdf" dot-fname fname))
+  ;;    (unix::system (format nil "neato -Tpdf ~a -o ~a-neato.pdf" dot-fname fname))
+  ;;    (unix::system (format nil "fdp -n -Gsplines=true -Tpdf ~a -o ~a-fdp.pdf" dot-fname fname))
+  ;;    (unix::system (format nil "twopi -n -Gsplines=true -Tpdf ~a -o ~a-twopi.pdf" dot-fname fname))
+  ;;    t))
+
   )
 
 (defclass extended-node
@@ -155,7 +212,9 @@
          (:solved
           solved)
          (:robot-pose
-          robot-pose)
+          (if robot-pose-optimized
+              robot-pose-optimized
+            robot-pose))
          (:robot-pose-optimized
           robot-pose-optimized)
          (:base-coords
