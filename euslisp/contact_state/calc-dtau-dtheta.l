@@ -62,7 +62,7 @@
    ;;   (setf (aref W i i) (elt tmp-W i)))
 
     ;; (print "tau-tmp:")
-    ;; (print tau-tmp)
+;;     (print tau-tmp)
     ;; (print tmp-W)
     ;; (print tau)
     ;;  (print dtau/dq)
@@ -75,18 +75,21 @@
    (setq *tau* tau)
    
   ;; (setq tmp-W #f(0 0 0 0 0 0 0 0 0 1 0))
-   (if use-base 
-       (setq tmp-W #f(0 0 0 0 1 0 0 0))
-     (setq tmp-W #f(0 1 0 0 0)))
+   ;; (if use-base 
+   ;;     (setq tmp-W #f(0 0 0 0 1 0 0 0))
+   ;;   (setq tmp-W #f(0 1 0 0 0)))
 
 ;;   (print (reduce '+ (send-all (send-all ll :joint) :joint-dof)))
 ;   (print "----------------")
-   (print tau)
-   (format-array dtau/dq)
+;;   (print tau)
+;;   (format-array dtau/dq)
    (dotimes (i (reduce '+ (send-all (send-all ll :joint) :joint-dof)))
+     (let ((mr (matrix-row dtau/dq i)))
+       (if use-base
+           (setf (elt mr 2) (* 0.0 (elt mr 2))))
 ;;     (print (norm (scale (elt tau i) (matrix-row dtau/dq i))))
      ;; (setq z (v+ z (scale (* (elt tmp-W i) (elt tau i)) (matrix-row dtau/dq i)))))
-     (setq z (v+ z (scale (elt tmp-W i) (normalize-vector (scale (elt tau i) (matrix-row dtau/dq i)))))))
+     (setq z (v+ z (scale (elt tmp-W i) (normalize-vector (scale (elt tau i) mr)))))))
 
  ;;  (print "----------------")
 
@@ -98,7 +101,7 @@
    ;; (setf (elt z 2) 0)
 ;;   (setf (elt z 3) 0)
    (setq *z* z)
-   (push tau-tmp *torque*)
+;;   (push tau-tmp *torque*)
  ;; (setq z (transform W (v+ (scale 0.5 (transform (transpose dtau/dq) tau)) (scale 0.5 (transform tau dtau/dq)))))
    ;; (print z)
    z))
