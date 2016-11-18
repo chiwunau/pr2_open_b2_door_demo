@@ -56,7 +56,7 @@
                 )
               ))))))))
 
-  (clear-zero-relation-nodes graph)
+;;  (clear-zero-relation-nodes graph)
   (dolist (n *bridge-nodes*)
     (let ((ri (get-node (car (send n :get-value :islands))))
           (li (get-node (cadr (send n :get-value :islands)))))
@@ -81,8 +81,8 @@
   (defmethod a*-graph-search-solver
     (:hn (n p)
        0.0))
-  ;; (setq *solver* (instance a*-graph-search-solver :init *graph*))
-  (setq *solver* (instance depth-first-graph-search-solver))
+  (setq *solver* (instance a*-graph-search-solver :init *graph*))
+  ;; (setq *solver* (instance depth-first-graph-search-solver))
   (setq *path* (send *solver* :solve *graph* :verbose nil))
   )
 
@@ -125,7 +125,6 @@
 ;;        (send *irtviewer* :viewer :viewsurface :write-to-image-file (format nil "~A_~A" c (send n :name)))
         (incf c)
         (unix:usleep (* 1000 t-inv))))))
-       
 
 (defun execute-robot-motion (&optional (p *path*))
   (let ((t-interval 5000.0) ;msec
@@ -161,13 +160,20 @@
 
     (send *ri* :angle-vector (car avs) 1000)
     (unix::usleep (* 1000 1000))
-;;    (send *ri* :wait-interpolation)
+    (send *ri* :wait-interpolation)
+
+    (do-until-key 
+     (print "press key")
+     (unix::usleep (* 1000 1000)))
     (setq sttm (ros::time+ (ros::time-now) (ros::time 2)))
     (setq *traj-points* traj-points)
     (setq *base-cds-list* base-cds-list)
     (setq *avs* avs)
 
-    (send *ri* :angle-vector-sequence avs (list t-interval) :default-controller sttm)
+    (print "check1")
+    (send *ri* :angle-vector-sequence avs 
+          (make-list (length avs) :initial-element t-interval)
+          :default-controller sttm)
     (print "check")
     (send *ri* :move-trajectory-sequence 
           (reverse traj-points)
