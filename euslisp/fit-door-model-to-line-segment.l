@@ -1,14 +1,22 @@
+(require "package://pr2eus/pr2-interface.l")
+
+(unless (boundp '*irtviewer*)
+  (make-irtviewer))
+(unless (boundp '*pr2*)
+  (pr2)
+  (objects *pr2*))
 (load "make-door.l")
 (ros::roseus-add-msgs "visualization_msgs")
 (ros::roseus "door_model_fiiting")
 
 
-(setq *all-line-segments* nil)
-(setq *line-segments* nil)
+(setq *all-cb-line-segments* nil)
+(setq *line-cb-segments* nil)
 (setq *stored-line-segments* nil)
 (setq *line-segments-groups* nil)
 (setq *all-refined-line-segments* nil)
 (setq *refined-line-segments* nil)
+(setq *robot-start-cds* nil)
 
 
 (defun line-segment-cb (msgs)
@@ -17,7 +25,14 @@
     (ros::ros-info "no line segment detected")
     (return-from line-segment-cb))
   (setq *line-segments* nil)
-  (let ((marker-list (send msgs :markers)))
+  (let ((marker-list (send msgs :markers))
+        trans)
+
+    (setq trans (send *tfl* :lookup-transform "/odom_combined" "/base_footprint" (ros::time 0)))
+    (if (not *robot-start-cds*)
+        (setq *robot-start-cds* trans))
+    (send *pr2* :move-to (send *robot-start-cds* :transformation trans) :world)
+
     (dolist (mk marker-list)
       (let (p0 p1 l)
         (setq p0 (ros::tf-point->pos (car (send mk :points))))
@@ -27,8 +42,8 @@
         (setf (elt p0 2) 0)
         (setf (elt p1 2) 0)
         (setq l (make-line p0 p1))
-        (push l *all-line-segments*)
-        (push l *line-segments*)))))
+        (push l *all-cb-line-segments*)
+        (push l *cb-line-segments*)))))
 
 (defun draw-line-segments (&optional (target *line-segments*))
   (let (cylinder color)
@@ -70,8 +85,6 @@
       (dolist (member tmp-list)
         (setq all-vertices (remove member all-vertices)))
       (push tmp-list clusters))
-
-    (setq *c* clusters)
 
     (let* ((length-list (mapcar #'length clusters))
            pos1 pos2 max1 max2 tmp)
@@ -117,26 +130,34 @@
 (defun test (&key (sec 1))
   (clear)
   (setq *stored-line-segments* nil)
-  (let ((st-tm (ros::time-now)))
+  (let ((st-tm (ros::time-now))
+        accumulated-line-segments
+        line-clusters
+        refined-line-segments)
     (while (and (ros::ok) (ros::time<= (ros::time- (ros::time-now) st-tm) (ros::time sec)))
+      (setq *cb-line-segments* nil)
       (ros::sleep)
       (ros::spin-once)
-      (draw-line-segments)
-      (when *line-segments* 
-        (setq  *stored-line-segments* (append *stored-line-segments* *line-segments*)))))
+      (when *cb-line-segments*
+        (draw-line-segments *cb-line-segments*)
+        (setq accumulated-line-segments (append accumulated-line-segments *cb-line-segments*))))
+    (clear)
   
-  (clustering-line-segments *stored-line-segments*) ;;-->*line-segments-groups*
-  (clear)
+  ;;;FIRST REFINEMENT
+  (setq line-clusters (clustering-line-segments accumulated-line-segments))
+  (dolist (line-cluster line-clusters)
+    (push (refine-line-segments-group line-cluster) refined-line-segments))
+  ;;SECOND REFINEMENT
+  (setq line-clusters (clustering-line-segments refined-line-segments))
+  (setq refined-line-segments nil)
+  (dolist (line-cluster line-clusters)
+    (push (refine-line-segments-group line-cluster) refined-line-segments))
 
-  (setq *refined-line-segments* nil)
-  (dolist (ln-group *line-segments-groups*)
-    (push (refine-line-segments-group ln-group) *refined-line-segments*))
-  (setq *all-refined-line-segments* (append *all-refined-line-segments* *refined-line-segments*))
-  (draw-line-segments *refined-line-segments*))
-    
+  (push refined-line-segments *all-refined-line-segments*)
+  (draw-line-segments refined-line-segments)))
 
 
-(defun clustering-line-segments (&optional (target *stored-line-segments*) (ang-thres 10))
+(defun clustering-line-segments (target &optional (ang-thres 3))
   (let (clusters tmp-list) ;;((l11 l12 l13) (l21 l22 l23) ....)
     (while target
       (setq seed (car target))
@@ -144,19 +165,17 @@
 
 
       (dolist (ln target) ;;found lines on the same line
-        (if (and (< (rad2deg (vector-angle (send seed :direction) (send ln :direction))) ang-thres)
+        (if (and (or (< (rad2deg (vector-angle (send seed :direction) (send ln :direction))) ang-thres)
+                     (< (rad2deg (- pi (vector-angle (send seed :direction) (send ln :direction)))) ang-thres))
                  (< (send seed :distance ln) 100)) ;10cm
             (push ln tmp-list)))
 
-      (setq *line-segments-groups* nil)
       (dolist (member tmp-list)
         (setq target (remove member target :count 1)))
       (push tmp-list clusters))
-    (setq *line-segments-groups* clusters)))
-    
+    clusters))
 
-
-(defun reset()  
+(defun reset() 
   (setq *all-line-segments* nil)
   (setq *line-segments* nil)
   (setq *all-refined-line-segments* nil)
@@ -184,11 +203,10 @@
 
 (while t
   (test :sec 0.5)
-  (let* ((dist-list (mapcar #'(lambda (ln) (send ln :distance (send *pr2* :pos))) *refined-line-segments*))
-         (min-dist (find-extream dist-list #'identity #'<))
-         (posi (position min-dist dist-list)))
-    (send *irtviewer* :objects (generate-door-from-line-segment (elt *refined-line-segments* posi)))
-    (send *irtviewer* :draw-objects))
+  ;; (let* ((dist-list (mapcar #'(lambda (ln) (send ln :distance (send *pr2* :pos))) *refined-line-segments*))
+  ;;        (min-dist (find-extream dist-list #'identity #'<))
+  ;;        (posi (position min-dist dist-list)))
+  ;;   (send *irtviewer* :objects (generate-door-from-line-segment (elt *refined-line-segments* posi)))
+  ;;   (send *irtviewer* :draw-objects))
   (unix:usleep (* 1000 500)))
-    
 
