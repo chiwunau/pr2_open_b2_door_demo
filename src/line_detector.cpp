@@ -22,9 +22,9 @@ ros::Publisher marker_arr_pub;
 ros::Publisher pub_inliers_;
 ros::Publisher pub_coefficients_;
 boost::mutex mutex_;
-float ransac_dist_thres_ = 0.01; //5cm
+float ransac_dist_thres_ = 0.05; //5cm
 int ransac_min_inliers_ = 50;
-int ransac_min_trial_ = 3;
+int ransac_min_trial_ = 5;
 int ransac_model_min_points_ = 30; // 2* ransac_min_inliers__
 float cluster_tolerance_ = 0.15; //30cm
 int cluster_min_size_ = 30;
@@ -162,7 +162,7 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
   // Convert to PCL data type
   pcl::fromROSMsg(*cloud_msg, *cloud);
   
-  std::cout<<cloud->points.size()<<std::endl;
+  //std::cout<<cloud->points.size()<<std::endl;
   //Extract cloud clusters
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
   tree->setInputCloud (cloud);
