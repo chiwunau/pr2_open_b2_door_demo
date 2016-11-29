@@ -23,57 +23,80 @@ ros::Publisher pub_inliers_;
 ros::Publisher pub_coefficients_;
 boost::mutex mutex_;
 float ransac_dist_thres_ = 0.05; //5cm
-int ransac_min_inliers_ = 50;
+// float ransac_dist_thres_ = 0.05; //5cm
+int ransac_min_inliers_ = 10;
 int ransac_min_trial_ = 5;
+// int ransac_min_trial_ = 5;
+// int ransac_model_min_points_ = 30; // 2* ransac_min_inliers__
 int ransac_model_min_points_ = 30; // 2* ransac_min_inliers__
-float cluster_tolerance_ = 0.15; //30cm
+// float cluster_tolerance_ = 0.15; //30cm
+float cluster_tolerance_ = 0.05; //30cm
 int cluster_min_size_ = 30;
 int base_scan_total_size = 1040;
 
-  void applyRecursiveRANSAC(const pcl::PointCloud<pcl::PointXYZ>::Ptr& input, std::vector<pcl::PointIndices::Ptr>& output_inliers, std::vector<pcl::ModelCoefficients::Ptr>& output_coefficients){
-    pcl::PointCloud<pcl::PointXYZ>::Ptr rest_cloud (new pcl::PointCloud<pcl::PointXYZ>);
-    *rest_cloud = *input;
-    int counter = 0;
-    while (true) {
-      ++counter;
-      pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
-      pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
-
-      pcl::SACSegmentation<pcl::PointXYZ> seg;
-      seg.setOptimizeCoefficients (true);
-      seg.setModelType (pcl::SACMODEL_LINE);
-      seg.setMethodType (pcl::SAC_RANSAC);
-      seg.setDistanceThreshold (ransac_dist_thres_);
-      seg.setInputCloud (rest_cloud);
-      seg.segment (*inliers, *coefficients);
-
-      //prepare for next loop
-      pcl::PointCloud<pcl::PointXYZ>::Ptr next_rest_cloud (new pcl::PointCloud<pcl::PointXYZ>);
-
-      if (inliers->indices.size() >= ransac_min_inliers_) {
-        output_inliers.push_back(inliers);
-        output_coefficients.push_back(coefficients);
-        pcl::ExtractIndices<pcl::PointXYZ> ex;
-        ex.setInputCloud (rest_cloud);
-        ex.setIndices (inliers);
-        ex.setNegative (true);
-        ex.setKeepOrganized(true);
-        ex.filter(*next_rest_cloud);
+void applyRecursiveRANSAC(const pcl::PointCloud<pcl::PointXYZ>::Ptr& input, std::vector<pcl::PointIndices::Ptr>& output_inliers, std::vector<pcl::ModelCoefficients::Ptr>& output_coefficients){
+  pcl::PointCloud<pcl::PointXYZ>::Ptr rest_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointIndices::Ptr nonnan_indices (new pcl::PointIndices);
+  *rest_cloud = *input;
+  int counter = 0;
+  while (true) {
+    ++counter;
+    nonnan_indices->indices.clear();
+    for (size_t i = 0; i < rest_cloud->points.size(); i++) {
+      pcl::PointXYZ p = rest_cloud->points[i];
+      if (!isnan(p.x) && !isnan(p.y) && !isnan(p.z)) {
+        nonnan_indices->indices.push_back(i);
       }
-      else{
-                next_rest_cloud = rest_cloud;
-        if (ransac_min_trial_ <= counter) {
-          return;
-        }
-        
-      } 
- 
+    }
+    pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
+    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
 
-    if (next_rest_cloud->points.size() < ransac_model_min_points_) {
+    pcl::SACSegmentation<pcl::PointXYZ> seg;
+    seg.setOptimizeCoefficients (true);
+    seg.setModelType (pcl::SACMODEL_LINE);
+    seg.setMethodType (pcl::SAC_RANSAC);
+    seg.setDistanceThreshold (ransac_dist_thres_);
+    seg.setInputCloud (rest_cloud);
+    seg.setIndices (nonnan_indices);
+    seg.segment (*inliers, *coefficients);
+    // std::cout<<"max_iteration:"<<seg.getMaxIterations()<<std::endl;
+
+    // std::cout<<"inliers_in_ransac:"<<inliers->indices.size()<<std::endl;
+    //prepare for next loop
+
+    pcl::PointCloud<pcl::PointXYZ>::Ptr next_rest_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+    if (inliers->indices.size() >= ransac_min_inliers_) {
+      output_inliers.push_back(inliers);
+      output_coefficients.push_back(coefficients);
+      pcl::ExtractIndices<pcl::PointXYZ> ex;
+      ex.setInputCloud (rest_cloud);
+      ex.setIndices (inliers);
+      ex.setNegative (true);
+      ex.setKeepOrganized(true);
+      ex.filter(*next_rest_cloud);
+      // std::cout<<counter<<std::endl;
+      // std::cout<<"cloud size:"<<next_rest_cloud->points.size()<<std::endl;
+    }
+    else{
+      next_rest_cloud = rest_cloud;
+      if (ransac_min_trial_ <= counter) {
+        return;
+      }
+    }
+
+    nonnan_indices->indices.clear();
+    for (size_t i = 0; i < next_rest_cloud->points.size(); i++) {
+      pcl::PointXYZ p = next_rest_cloud->points[i];
+      if (!isnan(p.x) && !isnan(p.y) && !isnan(p.z)) {
+        nonnan_indices->indices.push_back(i);
+      }
+    }
+    // std::cout<<"left_cloud_size:"<<nonnan_indices->indices.size()<<std::endl;;
+    if (nonnan_indices->indices.size() < ransac_model_min_points_) {
       return;
     }
     rest_cloud = next_rest_cloud;
-    }
+  }
 }
 
   Eigen::Vector3d* calculate_inliner_polars(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,const pcl::PointIndices::Ptr& inliers,const pcl::ModelCoefficients::Ptr& coefficients)
@@ -131,12 +154,6 @@ visualization_msgs::Marker::Ptr make_line_marker(const pcl::PointCloud<pcl::Poin
   return marker;
 }
 
-  
-  
-
-
-
-
 
   // Eigen::Vector3d* res (new Eigen::Vector3d[2]);
   // Eigen::Vector3d point_on_line (*coefficients[0], *coefficients[1], *coefficients[2]);
@@ -147,6 +164,7 @@ visualization_msgs::Marker::Ptr make_line_marker(const pcl::PointCloud<pcl::Poin
 void 
 cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 {
+  std::cout<<"cloud callback"<<std::endl;
   boost::mutex::scoped_lock lock(mutex_);
 
   // Container for original & filtered data
@@ -161,35 +179,75 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 
   // Convert to PCL data type
   pcl::fromROSMsg(*cloud_msg, *cloud);
-  
+  pcl::PointIndices::Ptr nonnan_indices (new pcl::PointIndices);
+  for (size_t i = 0; i < cloud->points.size(); i++) {
+    pcl::PointXYZ p = cloud->points[i];
+    if (!isnan(p.x) && !isnan(p.y) && !isnan(p.z)) {
+      nonnan_indices->indices.push_back(i);
+    }
+  }
+  // std::cout<<cloud->points[0].x<<std::endl;
+  // std::cout<<cloud->points[0].y<<std::endl;
+  // std::cout<<cloud->points[0].z<<std::endl;
+  // std::cout<<"-----------------"<<std::endl;
+  // std::cout<<cloud->points[1].x<<std::endl;
+  // std::cout<<cloud->points[1].y<<std::endl;
+  // std::cout<<cloud->points[1].z<<std::endl;
+
+  // return;
+
   //std::cout<<cloud->points.size()<<std::endl;
   //Extract cloud clusters
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
   tree->setInputCloud (cloud);
+  std::vector<pcl::PointIndices> pre_cluster_indices;
   std::vector<pcl::PointIndices> cluster_indices;
   pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
   ec.setClusterTolerance(cluster_tolerance_); //100mm
   ec.setMinClusterSize (cluster_min_size_);
-  //  ec.setMaxClusterSize (10000);
+  ec.setMaxClusterSize (1000000);
   ec.setSearchMethod (tree);
   ec.setInputCloud (cloud);
-  ec.extract (cluster_indices);
-  
-  pcl::ExtractIndices<pcl::PointXYZ> ex;
-  ex.setInputCloud(cloud);
-  ex.setKeepOrganized(true);
-  ex.setNegative(false);
+  ec.setIndices (nonnan_indices);
+  ec.extract (pre_cluster_indices);
 
   //For every cluster calculate line segment
+  for (size_t i = 0; i < pre_cluster_indices.size(); i++){
+    // std::cout<<pre_cluster_indices[i].indices.size()<<std::endl;
+    size_t indices_size = pre_cluster_indices[i].indices.size();
+      // std::cout<<pre_cluster_indices[i].indices.size()<<std::endl;
+    for (size_t j = 0; j < indices_size /100; j++){
+      size_t tail;
+      if (j == indices_size /100 - 1){
+        tail = indices_size;}
+      else{
+        tail = (j + 1) * 100;}
+      // std::cout<<tail<<std::endl;
+      pcl::PointIndices splited_indices;
+      for (size_t k = j * 100; k < tail; k++){
+        // std::cout<<pre_cluster_indices[i].indices[k]<<std::endl;
+        splited_indices.indices.push_back(pre_cluster_indices[i].indices[k]);
+      }
+      cluster_indices.push_back(splited_indices);
+    }}
+  // std::cout<<pre_cluster_indices.size()<<std::endl;
+  // std::cout<<cluster_indices.size()<<std::endl;
+
   for (size_t i = 0; i < cluster_indices.size(); i++){
     pcl::PointIndices::Ptr indices (new pcl::PointIndices ());
     *indices = cluster_indices[i];
     pcl::PointCloud<pcl::PointXYZ>::Ptr cluster_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::ExtractIndices<pcl::PointXYZ> ex;
+    ex.setInputCloud(cloud);
+    ex.setKeepOrganized(true);
+    ex.setNegative(false);
     ex.setIndices (indices);
     ex.filter (*cluster_cloud);
-    std::vector<pcl::PointIndices::Ptr> inliers;  
+    // std::cout<<cluster_cloud->points.size()<<std::endl;
+    std::vector<pcl::PointIndices::Ptr> inliers;
     std::vector<pcl::ModelCoefficients::Ptr> coefficients;
     applyRecursiveRANSAC(cluster_cloud, inliers, coefficients);
+    // std::cout<<"inliers_size:"<<inliers.size()<<std::endl;
     for (size_t j = 0; j < inliers.size(); j++){
       all_inliers.push_back(inliers[j]);
     }
@@ -198,6 +256,7 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     }
   }
 
+  // std::cout<<"all_inliers_size:"<<all_inliers.size()<<std::endl;
   //make colorized cloud
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr colored_cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
   colored_cloud->header = cloud->header;
@@ -208,20 +267,21 @@ cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     colored_cloud->points[i].z = cloud->points[i].z;
   }
 
-  for (size_t i = 0; i < all_inliers.size(); i++){
+  for (size_t i = 0; i < cluster_indices.size(); i++){
     uint red = rand() % 256;
     uint green = rand() % 256;
     uint blue = rand() % 256;
     
-    for(size_t j = 0; j < all_inliers[i]->indices.size(); j++){
-      colored_cloud->points[all_inliers[i]->indices[j]].r = red;
-      colored_cloud->points[all_inliers[i]->indices[j]].g = green;
-      colored_cloud->points[all_inliers[i]->indices[j]].b = blue;
+    for(size_t j = 0; j < cluster_indices[i].indices.size(); j++){
+      colored_cloud->points[cluster_indices[i].indices[j]].r = red;
+      colored_cloud->points[cluster_indices[i].indices[j]].g = green;
+      colored_cloud->points[cluster_indices[i].indices[j]].b = blue;
     }
   }
 
   //make line marker message
   visualization_msgs::MarkerArray marker_array;
+  // std::cout<<"number of line:"<<all_inliers.size()<<std::endl;
   for(size_t i = 0; i < all_inliers.size(); i++)
     {
       visualization_msgs::Marker::Ptr marker;
@@ -251,8 +311,9 @@ main (int argc, char** argv)
   ros::Subscriber sub = nh.subscribe<sensor_msgs::PointCloud2> ("input", 1, cloud_cb);
 
   // Create a ROS publisher for the output point cloud
-  pub = nh.advertise<sensor_msgs::PointCloud2> ("output", 1);
+  pub = nh.advertise<sensor_msgs::PointCloud2> ("colored_cloud", 1);
   marker_arr_pub = nh.advertise<visualization_msgs::MarkerArray> ("markers_output", 1);
+
   // pub_inliers_ = nh.advertise<jsk_recognition_msgs::ClusterPointIndices>("/line_segmentation/output_indices", 1);
   // pub_coefficients_ = nh.advertise<jsk_recognition_msgs::ModelCoefficientsArray>("/line_segmentation/output_coefficnets", 1);
 
