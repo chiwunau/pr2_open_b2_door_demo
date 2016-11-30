@@ -213,9 +213,9 @@ void refineModel(const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud, std::ve
   std::vector<int> sorted_inliers_index;
   for (size_t i = 0; i < input_inliers.size(); i++){
     each_begin_index.push_back(input_inliers[i]->indices[0]);
-    std::cout<<"("<<input_inliers[i]->indices[0]<<","<<input_inliers[i]->indices[input_inliers[i]->indices.size() -1]<<") ";
+    // std::cout<<"("<<input_inliers[i]->indices[0]<<","<<input_inliers[i]->indices[input_inliers[i]->indices.size() -1]<<") ";
   }
-  std::cout<<std::endl;
+  // std::cout<<std::endl;
 
   std::copy(each_begin_index.begin(), each_begin_index.end(), std::back_inserter(sorted_begin_index));
   std::sort(sorted_begin_index.begin(), sorted_begin_index.end());
@@ -225,10 +225,10 @@ void refineModel(const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud, std::ve
     sorted_inliers_index.push_back(pos);
   }
 
-  for (size_t i = 0; i < sorted_inliers_index.size(); i++){
-    each_begin_index.push_back(input_inliers[i]->indices[0]);
-    std::cout<<sorted_inliers_index[i]<<" ";
-  }
+  // for (size_t i = 0; i < sorted_inliers_index.size(); i++){
+  //   each_begin_index.push_back(input_inliers[i]->indices[0]);
+  //   std::cout<<sorted_inliers_index[i]<<" ";
+  // }
 
 
   Group* g;  
@@ -267,16 +267,16 @@ void refineModel(const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud, std::ve
             Eigen::Vector3d diff;
             for (size_t mp = 0; mp < 2; mp++){
               for (size_t nlp = 0; nlp < 2; nlp++){
-                std::cout<<"mp:"<<mp<<"  nlp:"<< nlp<<std::endl;
+                // std::cout<<"mp:"<<mp<<"  nlp:"<< nlp<<std::endl;
                 // (m_polars[mp] - nl_polars[nlp]).norm();
                 diff = m_polars[mp] - nl_polars[nlp];
                 if (diff.norm() < min_dist || min_dist < 0){
                   min_dist = diff.norm();
-                  std::cout<<diff[0]<<" "<< diff[1]<<" "<<diff[2]<<std::endl;
+                  // std::cout<<diff[0]<<" "<< diff[1]<<" "<<diff[2]<<std::endl;
                 }
               }
             }
-            std::cout<<"min_distance: "<<i<<" "<<j<<" "<<k<<" "<<min_dist<<std::endl;
+            // std::cout<<"min_distance: "<<i<<" "<<j<<" "<<k<<" "<<min_dist<<std::endl;
             if  (min_dist <= 0.05){
               groups[j].members.push_back(i);
               found_group = true;
@@ -286,17 +286,17 @@ void refineModel(const pcl::PointCloud<pcl::PointXYZ>::Ptr& input_cloud, std::ve
         if (found_group == true){
           break;}
       }
-      std::cout<<"---------------"<<std::endl;
+      // std::cout<<"---------------"<<std::endl;
       if (found_group == false){
         g = new Group;
-        std::cout<<"NEW_GROUP"<<std::endl;
+        // std::cout<<"NEW_GROUP"<<std::endl;
         // g->members = new std::vector<int>;
         g->members.push_back(i);
         groups.push_back(*g);
       }
     }
   }
-  std::cout<<"refined_group_size"<<groups.size()<<std::endl;
+  // std::cout<<"refined_group_size"<<groups.size()<<std::endl;
   for (size_t i=0; i < groups.size(); i++){
     pcl::PointIndices::Ptr group_inliers (new pcl::PointIndices);
     for (size_t j=0; j < groups[i].members.size(); j++){
@@ -515,7 +515,7 @@ main (int argc, char** argv)
   // pub_coefficients_ = nh.advertise<jsk_recognition_msgs::ModelCoefficientsArray>("/line_segmentation/output_coefficnets", 1);
 
   // Spin
-  ros::Rate loop_rate(10);
+  ros::Rate loop_rate(20);
   while(ros::ok()){
     ros::spinOnce ();
     loop_rate.sleep();
