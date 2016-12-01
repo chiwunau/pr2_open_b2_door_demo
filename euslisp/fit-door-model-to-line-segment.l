@@ -126,7 +126,7 @@
           (print (send tgt-line :nvertex))
           (print (send tgt-line :pvertex))
           (setq ln (make-line (send tgt-line :nvertex) (send tgt-line :pvertex))))
-      (setq ln line))
+      (setq ln tgt-line))
     (if (< (vector-angle #f(0 0 1) (normalize-vector (v* (matrix-column (send *pr2* :rot) 0) (send fixed-line :direction)))) pi/2) ;;cross product point up
         (setq fixed-ln (make-line (send fixed-line :nvertex) (send fixed-line :pvertex)))
       (setq fixed-ln fixed-line))
@@ -280,6 +280,7 @@
                        (send (elt *final-line-seq* i) :length))
                ))
     (draw-line-segments (remove (elt *final-line-seq* i) (elt *all-refined-line-segments* i)) :color :grey)
+    (draw-line-segments (list *door-plane-line*) :color :green)
     (unix:usleep (* 1000 play-speed))
     (clear-scene))
             )
@@ -322,9 +323,11 @@
                        (> (elt (send ml :point 0.5) 0) 0)
                        (and (> (rad2deg (abs (vector-angle (send ml :direction) (send *door-plane-line* :direction) #f(0 0 1)))) 4)
                             (< (rad2deg (abs (vector-angle (send ml :direction) (send *door-plane-line* :direction) #f(0 0 1)))) 176))
-                       (and (> (send *door-plane-line* :foot (send ml :pvertex)) -0.2) (< (send *door-plane-line* :foot (send ml :pvertex)) 1.2))
-                       (and (> (send *door-plane-line* :foot (send ml :nvertex)) -0.2) (< (send *door-plane-line* :foot (send ml :nvertex)) 1.2))
-                       (and (> (send *door-plane-line* :foot (send ml :nvertex)) -0.2) (< (send *door-plane-line* :foot (send ml :nvertex)) 1.2))
+                       (and (> (send *door-plane-line* :foot (send ml :pvertex)) -0.2) (< (send *door-plane-line* :foot (send ml :pvertex)) 1.2)
+                            (> (send *door-plane-line* :foot (send ml :nvertex)) -0.2) (< (send *door-plane-line* :foot (send ml :nvertex)) 1.2))
+                       (and (> (send *door-plane-line* :foot (send ml :nvertex)) -0.2) (< (send *door-plane-line* :foot (send ml :nvertex)) 1.2)
+                            (> (send *door-plane-line* :foot (send ml :nvertex)) -0.2) (< (send *door-plane-line* :foot (send ml :nvertex)) 1.2))
+                       (and (> (car (send *door-plane-line* :intersection ml)) -0.2) (< (car (send *door-plane-line* :intersection ml)) 1.2))
                        )
                   (push ml candidate-list)))
             ;; (setq dist-list (mapcar #'(lambda (ln) (send ln :distance *door-plane-line*)) candidate-list)) ;;for human open
@@ -398,8 +401,20 @@
 (output_detected_door_angle)
 ;;-----------------------------------------------------;;
 
+;;----draw moving seq-------------;;;
+(dotimes (i (length *move-line-seq*))
+  (if (elt *move-line-seq* i)
+      (draw-line-segments (elt *move-line-seq* i) :color :yellow))
+  (if (elt *fix-line-seq* i)
+      (draw-line-segments (elt *fix-line-seq* i) :color :grey))
+  (unix:usleep (* 1000 50))
+  (clear-scene))
+;;----draw moving seq-------------;;;
 
-
+(dotimes (i 5)
+  (setq *door* (generate-door-from-line-segment (elt *final-line-seq* 114) *door-plane-line* 958.926 (/ 130.03 2)))
+  (send *door* :hinge :joint-angle (* i -20))
+  (send *irtviewer* :objects *door*))
 ;;(draw-line-segments (list (refine-line-segments-group (elt *line-segments-group* 3))))
 ;;$ (while t (test :sec 0.5) (dolist (l *refined-line-segments*) (send *irtviewer* :objects (generatesend-door-from-line-segment l))) (send *irtviewer* :draw-objects) (unix:usleep (* 1000 500)))
 
