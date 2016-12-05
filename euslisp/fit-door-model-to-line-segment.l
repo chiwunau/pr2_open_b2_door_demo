@@ -24,6 +24,7 @@
 (setq *final-line-seq* nil)
 (setq *refined-fix-line-segments* nil)
 (setq *door-plane-line* nil)
+(setq *rotation-centers* nil)
 
 
 
@@ -56,13 +57,13 @@
         (push l *all-cb-line-segments*)
         (push l *cb-line-segments*)))))
 
-(defun draw-line-segments (&optional (target *line-segments*) &key (color nil))
+(defun draw-line-segments (&optional (target *line-segments*) &key (color nil) (fat 10))
   (let (cylinder
         (random-color? (if color nil t)))
       (dolist (l target)
         (if random-color?
             (setq color (float-vector (random 1.0) (random 1.0) (random 1.0))))
-      (setq cylinder (make-cylinder 10 (norm (v- (send l :nvertex) (send l :pvertex)))))
+      (setq cylinder (make-cylinder fat (norm (v- (send l :nvertex) (send l :pvertex)))))
       (send cylinder :translate (send l :pvertex))
       (send cylinder :rotate (deg2rad 90) :x)
       (send cylinder :rotate (+ (/ pi 2) (vector-angle #f(1 0 0) (send l :direction) #f(0 0 1))) :y)
@@ -258,7 +259,7 @@
     ))
 
 (defun output_detected_door_angle(&key (play-speed 50))
-  (format t "index EF_leastsq_angle angle length~%")
+  (format t "index EF_leastsq_angle angle Radius Radius_Err CenterX CenterY Center_err~%")
           (dotimes (i (length *all-robot-pose*))
             (send *pr2* :angle-vector (elt *all-robot-pose* i))
             (send *pr2* :move-to (elt *all-robot-base* i) :world)
@@ -269,7 +270,7 @@
         (progn (send-all *refined-line-segments* :length)
 ;;          (print (v- (send arm-proj-cds :pos) circle-center))
                (draw-line-segments (list (elt *final-line-seq* i)) :color #f(1 0 0))
-               (format t "~A ~A ~A ~A~%"
+               (format t "~A ~A ~A ~A ~A ~A ~A ~A~%"
                        i
                        ;;nil
                        (rad2deg (abs (vector-angle (normalize-vector (v- (send arm-proj-cds :pos) circle-center)) (normalize-vector (v- (car waypoints) circle-center)) #f(0 0 1))))
@@ -277,8 +278,12 @@
                        (if (<= (rad2deg (abs (vector-angle (send (elt *final-line-seq* i) :direction) (send *door-plane-line* :direction) #f(0 0 1)))) 90)
                            (rad2deg (abs (vector-angle (send (elt *final-line-seq* i) :direction) (send *door-plane-line* :direction) #f(0 0 1))))
                          (rad2deg (- pi (abs (vector-angle (send (elt *final-line-seq* i) :direction) (send *door-plane-line* :direction) #f(0 0 1))))))
-                       (send (elt *final-line-seq* i) :length))
-               ))
+                       (send (elt *final-line-seq* i) :length)
+                       (- (send (elt *final-line-seq* i) :length) circle-radius-true)
+                       (elt (elt *rotation-centers* i) 0)
+                       (elt (elt *rotation-centers* i) 1)
+                       (norm (v- (elt *rotation-centers* i) circle-center))
+                       )))
     (draw-line-segments (remove (elt *final-line-seq* i) (elt *all-refined-line-segments* i)) :color :grey)
     (draw-line-segments (list *door-plane-line*) :color :green)
     (unix:usleep (* 1000 play-speed))
@@ -325,8 +330,8 @@
                             (< (rad2deg (abs (vector-angle (send ml :direction) (send *door-plane-line* :direction) #f(0 0 1)))) 176))
                        (and (> (send *door-plane-line* :foot (send ml :pvertex)) -0.2) (< (send *door-plane-line* :foot (send ml :pvertex)) 1.2)
                             (> (send *door-plane-line* :foot (send ml :nvertex)) -0.2) (< (send *door-plane-line* :foot (send ml :nvertex)) 1.2))
-                       (and (> (send *door-plane-line* :foot (send ml :nvertex)) -0.2) (< (send *door-plane-line* :foot (send ml :nvertex)) 1.2)
-                            (> (send *door-plane-line* :foot (send ml :nvertex)) -0.2) (< (send *door-plane-line* :foot (send ml :nvertex)) 1.2))
+                       ;; (and (> (send *door-plane-line* :foot (send ml :nvertex)) -0.2) (< (send *door-plane-line* :foot (send ml :nvertex)) 1.2)
+                       ;;      (> (send *door-plane-line* :foot (send ml :nvertex)) -0.2) (< (send *door-plane-line* :foot (send ml :nvertex)) 1.2))
                        (and (> (car (send *door-plane-line* :intersection ml)) -0.2) (< (car (send *door-plane-line* :intersection ml)) 1.2))
                        )
                   (push ml candidate-list)))
@@ -374,6 +379,21 @@
   ;;       (return))
   ;;   (push (send (elt wayseq k) :point (car (send (elt wayseq k) :intersection (elt wayseq (+ k 1))))) axis-p))
 
+(defun calc-rotation-center-radius-from-door-seg ()
+  (setq *rotation-centers* nil)
+  (setq *rotation-radius* nil)
+  (let (center-list radius-list)
+    (dolist (dl *final-line-seq*)
+      (if dl
+          (progn
+          (push (send *door-plane-line* :point (car (send *door-plane-line* :intersection dl))) center-list)
+          (push (send dl :length) radius-list))
+        (progn
+          (push nil center-list)
+          (push nil radius-list)))
+      (setq *rotation-centers* (reverse center-list)))
+      (setq *rotation-radius* (reverse radius-list)))
+  nil)
 
 
 
@@ -396,25 +416,69 @@
 (progn (seperate_move_and_fix_line_segments) (print t))
 (progn (extract_door_lines) (print t))
 (setq *waypoints* (calc-rotate-center-from-poses))
-(setq circle-center #f(840.23227 876.45468 0)) ;;robot_open_1
-;; (setq circle-center #f(859.02818 816.39048 0)) ;;robot_open_2
+(calc-rotation-center-radius-from-door-seg)
+;;Cx=824.15008  Cy=876.15529  R=726.27988 ;;estimated from waypoints of robot_open_1
+;; #f(846.287 836.256 0) ground_true robot_open_1
+;; (setq circle-center #f(824.15008 876.45468 0)) ;;robot_open_1
+;; (setq circle-center #f(846.287 836.256 0))
+(setq circle-radius-true 821.0)
+;;Cx=883.01419  Cy=838.97770  R=737.25269 ;;estimated from waypoints of robot_open_2
+;; #f(825.648 795.87 0) ground_true robot_open_2
+(setq circle-center #f(825.648 795.87 0))
+;;(setq circle-center #f(883.01419 838.97770 0)) ;;robot_open_2
 (output_detected_door_angle)
-;;-----------------------------------------------------;;
+;; ;;-----------------------------------------------------;;
 
-;;----draw moving seq-------------;;;
+(dolist (w *waypoints*) (format t "~A ~A~%" (elt w 0) (elt w 1)))
+;; ;;----draw moving seq-------------;;;
 (dotimes (i (length *move-line-seq*))
   (if (elt *move-line-seq* i)
       (draw-line-segments (elt *move-line-seq* i) :color :yellow))
   (if (elt *fix-line-seq* i)
       (draw-line-segments (elt *fix-line-seq* i) :color :grey))
   (unix:usleep (* 1000 50))
-  (clear-scene))
-;;----draw moving seq-------------;;;
+   (clear-scene))
+;; ;;----draw moving seq-------------;;;
+(dotimes (i (length *final-line-seq*))
+  (if (elt *final-line-seq* i)
+        (draw-line-segments (list (elt *final-line-seq* i)) :color :red :fat 3))
+  (draw-line-segments (remove (elt *final-line-seq* i) (elt *all-refined-line-segments* i)) :color :grey :fat 3)
+  )
 
-(dotimes (i 5)
-  (setq *door* (generate-door-from-line-segment (elt *final-line-seq* 114) *door-plane-line* 958.926 (/ 130.03 2)))
-  (send *door* :hinge :joint-angle (* i -20))
-  (send *irtviewer* :objects *door*))
+;; ;;----------produce kinemaitc model graph of thesis--------------------;;
+;; (dotimes (i 5)
+;;   (setq *door* (generate-door-from-line-segment (elt *final-line-seq* 114) *door-plane-line* 958.926 (/ 130.03 2)))
+;;   (send *door* :hinge :joint-angle (* i -20))
+;;   (send *irtviewer* :objects *door*))
+;; ;;----------produce kinemaitc model graph of thesis--------------------;;
+
+(let (norm-errors)
+  (dolist (rc *rotation-centers*)
+    (if rc
+        (push (norm (v- circle-center rc)) norm-errors)
+      (push nil norm-errors)))
+  (setq norm-errors (reverse norm-errors))
+  norm-errors)
+
+(dolist (rc *rotation-centers*)
+  (if rc
+      (let ((c (make-cube 15 10 15)))
+        (send c :translate rc)
+        (send c :set-color :red)
+        (send *irtviewer* :objects c))))
+(let ((c (make-cube 15 10 15)))
+  (send c :translate circle-center)
+  (send c :set-color :blue)
+  (send *irtviewer* :objects c))
+
+
+(let ((c (make-cube 15 10 15)))
+  (send c :translate #f(883.01419 838.97770 0)) ;;extimated from end effector
+  (send c :set-color :yellow)
+  (send *irtviewer* :objects c))
+
+
+
 ;;(draw-line-segments (list (refine-line-segments-group (elt *line-segments-group* 3))))
 ;;$ (while t (test :sec 0.5) (dolist (l *refined-line-segments*) (send *irtviewer* :objects (generatesend-door-from-line-segment l))) (send *irtviewer* :draw-objects) (unix:usleep (* 1000 500)))
 
@@ -432,3 +496,9 @@
   ;; (unix:usleep (* 1000 500))
   
 
+(send c :translate #f(0  678 -945))
+(send c :translate #f(60 0 0))
+
+
+;;ground_true of robot_1
+;;(#<coordinates #Xa0f6ba8  786.307 837.782 4.039 / -0.025 0.0 0.0> #<cascaded-coords #X8499290 :larm-end-coords  769.062 160.001 949.039 / 0.054 -0.039 1.223> #<pr2-sensor-robot #X716c3a0 pr2  0.0 0.0 0.0 / 0.0 0.0 0.0>)
