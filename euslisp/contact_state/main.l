@@ -19,6 +19,7 @@
   (objects *pr2*)
   (make-door)
   (objects *door*)
+  (send *irtviewer* :objects (append ( send *irtviewer* :objects) (send *door* :get-rear-touch-cds-list)))
   ;;temp fix for bug where collisiion model does not update
   (send *pr2* :make-collision-model-for-links)
   (send (car (send *pr2* :torso :parent-link)) :make-pqpmodel))
@@ -31,6 +32,10 @@
   (send *pr2* :move-to (make-coords) :world)
   (send *pr2* :reset-pose)
   (send *door* :hinge :joint-angle 0)
+  (send *irtviewer* :objects (list *pr2*))
+  (send *irtviewer* :objects *door*)
+  (send *irtviewer* :objects (append ( send *irtviewer* :objects) (send *door* :get-rear-touch-cds-list)))
+
   ;; (setq *left-samples* (instance motion-samples :init))
   ;; (setq *right-samples* (instance motion-samples :init))
   )
@@ -39,9 +44,9 @@
 (defun demo ()
   (init)
   (init-all-container-nodes) ;;->*all-nodes*
-  (setq *time1* (bench (robot-pose-sampling))) ;; fill robot pose to *all-nodes*
+  (bench (robot-pose-sampling)) ;; fill robot pose to *all-nodes*
   (get-solvable-nodes) ;;if valid pose in *all-nodes* -> *solvable-nodes*
-  (setq *time2* (bench (init-bridge-nodes :nodes *solvable-nodes*)))) ;;->bridge-nodes
+  (bench (init-bridge-nodes :nodes *solvable-nodes*))) ;;->bridge-nodes
 
 (defun test-graph()
   (init)

@@ -22,25 +22,41 @@
     (+ (* cof-p diff-p) (* cof-b diff-b))))
 
 
-(defun overload-node? (n &optional (door-weight 2.5))
-  (let* ((force-cds (elt (send n :get :cds-info) 0))
-         ;;             (contact-pt (elt (send n :get :cds-info) 2))
-         (contact-pt (elt (reverse (set-contact-points (send n :get :arm))) (send n :get :contact-point)))
-         (max-tq (send *pr2* :max-torque-vector))
-         (overload nil)
-         drw tq)
-    (send *pr2* :angle-vector (send n :get :pose))
-    (send *pr2* :move-to (send n :get :base) :world)
-    (send *door* :hinge :joint-angle (send n :get :door-angle))
+;; (defun overload-node? (n &optional (door-weight 2.5))
+;;   (let* ((force-cds (elt (send n :get :cds-info) 0))
+;;          ;;             (contact-pt (elt (send n :get :cds-info) 2))
+;;          (contact-pt (elt (reverse (set-contact-points (send n :get :arm))) (send n :get :contact-point)))
+;;          (max-tq (send *pr2* :max-torque-vector))
+;;          (overload nil)
+;;          drw tq)
+;;     (send *pr2* :angle-vector (send n :get :pose))
+;;     (send *pr2* :move-to (send n :get :base) :world)
+;;     (send *door* :hinge :joint-angle (send n :get :door-angle))
     
-    (setq drw (door-reaction-wrench force-cds contact-pt door-weight))
-    (setq tq (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords (list contact-pt)))
+;;     (setq drw (door-reaction-wrench force-cds contact-pt door-weight))
+;;     (setq tq (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords (list contact-pt)))
     
-    (dotimes (i (length max-tq))
-      (if (> 0 (- (abs (elt max-tq i)) (abs (elt tq i))))
-          (setq overload t)))
+;;     (dotimes (i (length max-tq))
+;;       (if (> 0 (- (abs (elt max-tq i)) (abs (elt tq i))))
+;;           (setq overload t)))
 
-    overload))
+;;     overload))
+
+(defun colide-obstacle? (n)
+  (if (send n :get-value :robot-pose-optimized)
+      (progn
+        (send *pr2* :angle-vector (send n :get-value :robot-pose-optimized))
+        (send *pr2* :move-to (send n :get-value :base-coords-optimized) :world))
+    (progn
+      (send *pr2* :angle-vector (send n :get-value :robot-pose))
+      (send *pr2* :move-to (send n :get-value :base-coords) :world)))
+  (pqp-collision-check-objects 
+   (list (send *pr2* :base_footprint_lk))
+   (list *obs*))
+  )
+  
+  
+
 
 ;; (defun transitable? (n1 n2)
 ;;   (let* ((mid-pose (cadr (cadr (pos-list-interpolation (list (send n1 :get-value :pose) (send n2 :get-value :pose)) (list 1000) 500))))

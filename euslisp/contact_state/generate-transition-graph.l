@@ -13,7 +13,9 @@
 
 ;;   ;;add nodes to graph
   (dolist (n nodes)
-    (send graph :add-node n))
+    (when (and ;; (not (colide-obstacle? n))
+               (not (send n :get-value :overload?)))
+      (send graph :add-node n)))
             
   ;;init single point contact nodes
   (dotimes (depth (- *graph-depth* 1))
@@ -33,7 +35,7 @@
             (when (member n2 (send graph :nodes))
               (if (and (not (member goal-node (send n2 :neighbors))) (equal (send n2 :get-value :graph-depth) (- *graph-depth* 1))) ;;add end node
                     (send graph :add-arc n2 goal-node 1 :both nil))
-          (when (and (not (send n1 :get-value :overload?)) (not (send n2 :get-value :overload?)))
+              ;; (when (and (not (colide-obstacle? n1)) (not (colide-obstacle? n2)) (not (send n1 :get-value :overload?)) (not (send n2 :get-value :overload?)))
               (cond 
                ((or (eq (send n1 :get-value :contact-type) 'grasp) (eq (send n2 :get-value :contact-type) 'grasp)) ;;when either node is grasp knob
                 (if (and (equal (send n1 :get-value :object-coords-index) (send n2 :get-value :object-coords-index)) (equal (send n1 :get-value :arm) (send n2 :get-value :arm)))
@@ -54,7 +56,7 @@
                            (if (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :base-coords-optimized) (send n2 :get-value :base-coords)))
                           :both nil))
                 )
-              ))))))))
+              )))))))
 
 ;;  (clear-zero-relation-nodes graph)
   (dolist (n *bridge-nodes*)
