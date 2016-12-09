@@ -38,15 +38,20 @@
 
 (defun demo ()
   (init)
-;;  (set-contact-points)
-  (motion-generation))
+  (init-all-container-nodes) ;;->*all-nodes*
+  (setq *time1* (bench (robot-pose-sampling))) ;; fill robot pose to *all-nodes*
+  (get-solvable-nodes) ;;if valid pose in *all-nodes* -> *solvable-nodes*
+  (setq *time2* (bench (init-bridge-nodes :nodes *solvable-nodes*)))) ;;->bridge-nodes
 
 (defun test-graph()
   (init)
   (load "data/nodes-data-2016-11-12-long-ver2.dat")
-  (update-loaded-nodes)
+  (update-loaded-nodes) ;;put dependence in to coords
   (get-solvable-nodes)
-  (init-start-nodes)
+  (init-start-nodes) ;;init grasp nodes of both arms
   (robot-pose-sampling :nodes *start-nodes*)
   (init-nodes-torque-info :door-weight 5)
-  (bench (init-graph)))
+  (bench (init-graph))
+  (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
+  (clear-zero-relation-nodes *graph*)
+  )

@@ -62,16 +62,28 @@
           (li (get-node (cadr (send n :get-value :islands)))))
       (when (and (member ri (send graph :nodes)) (member li (send graph :nodes)))
         (send graph :add-node n)
-        (send graph :add-arc ri n 0 :both t)
-        (send graph :add-arc li n 0 :both t))))
+        (send graph :add-arc ri n
+              (calc-distance-between-pose
+               (if (send ri :get-value :robot-pose-optimized) (send ri :get-value :robot-pose-optimized) (send ri :get-value :robot-pose))
+               (send n :get-value :robot-pose)
+               (if (send ri :get-value :robot-pose-optimized) (send ri :get-value :base-coords-optimized) (send ri :get-value :base-coords))
+               (send n :get-value :base-coords))
+              :both t)
+        (send graph :add-arc li n 
+              (calc-distance-between-pose
+               (if (send li :get-value :robot-pose-optimized) (send li :get-value :robot-pose-optimized) (send li :get-value :robot-pose))
+               (send n :get-value :robot-pose)
+               (if (send li :get-value :robot-pose-optimized) (send li :get-value :base-coords-optimized) (send li :get-value :base-coords))
+               (send n :get-value :base-coords))
+              :both t))))
 
   (when (member (get-node "r-0-0-fk") (send graph :nodes))
     (send graph :add-node (car *start-nodes*))
-    (send graph :add-arc (car *start-nodes*) (get-node "r-0-0-fk") 0 :both nil))
+    (send graph :add-arc (car *start-nodes*) (get-node "r-0-0-fk") 1 :both nil))
 
   (when (member (get-node "l-0-0-fk") (send graph :nodes))
     (send graph :add-node (cadr *start-nodes*))
-    (send graph :add-arc (cadr *start-nodes*) (get-node "l-0-0-fk") 0 :both nil))
+    (send graph :add-arc (cadr *start-nodes*) (get-node "l-0-0-fk") 1 :both nil))
 
   (setq *graph* graph)
   (set-start-goal-state)
@@ -96,8 +108,8 @@
 (defun set-start-goal-state ()
  (send *graph* :start-state (send *graph* :node "start"))
   (send *graph* :goal-state (send *graph* :node "goal"))
-  ;; (send *graph* :start-state (send *graph* :node "r-0-1-3"))
-  ;; (send *graph* :goal-state (send *graph* :node "l-0-0-fk"))
+  ;; (send *graph* :start-state (send *graph* :node "r-0-s-fk"))
+  ;; (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
 )
 
 
@@ -181,3 +193,4 @@
           :start-time sttm
           :send-action t)
     ))
+

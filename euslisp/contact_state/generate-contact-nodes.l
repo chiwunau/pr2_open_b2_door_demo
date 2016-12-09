@@ -10,6 +10,7 @@
 (setq *ik-target-shift* #f(50 0 0)) ;;;target coords of IK shift from door plane
 (setq debugview-colli nil)
 (setq debugview-mintq nil)
+(setq debugview-bridge nil)
 ;; (setq debugview-colli :no-message)
 ;; (setq debugview-mintq :no-message)
 
@@ -146,7 +147,7 @@
                             :base-range (list :min (float-vector -600 -600 -80)
                                               :max (float-vector 600 600  80))
                             :warnp nil
-                            :debug-view nil
+                            :debug-view debugview-bridge
 
 
                             ))
