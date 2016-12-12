@@ -10,7 +10,7 @@
 (load "extended-graph.l")
 (load "calc-dtau-dtheta.l")
 (load "write-load-data.l")
-(load "~/ros/hydro/src/jsk-ros-pkg/euslib/rbrain/virtual_interpolator.l")
+;; (load "~/ros/hydro/src/jsk-ros-pkg/euslib/rbrain/virtual_interpolator.l")
 ;;(load "graph-search.l")
 
 (defun init()
@@ -50,7 +50,8 @@
 
 (defun test-graph()
   (init)
-  (load "data/nodes-data-2016-11-12-long-ver2.dat")
+  ;; (load "data/nodes-data-2016-11-12-long-ver2.dat")
+  (load "data/nodes-data-2016-12-11.dat")
   (update-loaded-nodes) ;;put dependence in to coords
   (get-solvable-nodes)
   (init-start-nodes) ;;init grasp nodes of both arms
@@ -60,3 +61,46 @@
   (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
   (clear-zero-relation-nodes *graph*)
   )
+
+
+;; (setq *path-list* nil)
+;; (dolist (obs *obs-list*)
+;;   (setq *obs* obs)
+;;   (bench (init-graph))
+;;   (if (send *graph* :node "l-0-s-fk")
+;;       (progn
+;;         (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
+;;         (solve-graph)
+;;         (if *path*
+;;             (progn (push *path* *path-list*)
+;;                    (send *obs* :set-color :green))
+;;           (progn
+;;             (push nil *path-list*)
+;;             (send *obs* :set-color :red))))
+;;     (progn
+;;       (push nil *path-list*)
+;;       (send *obs* :set-color :red)))
+;;   (send *irtviewer* :draw-objects))
+;; (setq *path-list* (reverse *path-list*))
+
+
+;; (dotimes (i (length *path-list*))
+;;   (when (elt *path-list* i)
+;;     (send (elt *obs-list* i) :set-color :yellow)
+;;     (play-path (elt *path-list* i))
+;;     (send (elt *obs-list* i) :set-color :green)))
+
+
+;; (dotimes (i (length *path-list*))
+;;   (unless (elt *path-list* i)
+;;     (setq *obs* (elt *obs-list* i))
+;;     (bench (init-graph))
+;;     (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
+;;     (solve-graph)
+;;     (if *path*
+;;         (progn
+;;           (setf (elt *path-list* i) *path*)
+;;           (send (elt *obs-list* i) :set-color :green))
+;;       (send (elt *obs-list* i) :set-color :red))))
+
+  

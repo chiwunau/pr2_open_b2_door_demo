@@ -212,9 +212,7 @@
          (:solved
           solved)
          (:robot-pose
-          (if robot-pose-optimized
-              robot-pose-optimized
-            robot-pose))
+            robot-pose)
          (:robot-pose-optimized
           robot-pose-optimized)
          (:base-coords

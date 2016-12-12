@@ -13,7 +13,7 @@
 
 ;;   ;;add nodes to graph
   (dolist (n nodes)
-    (when (and ;; (not (colide-obstacle? n))
+    (when (and (not (colide-obstacle? n))
                (not (send n :get-value :overload?)))
       (send graph :add-node n)))
             
@@ -196,3 +196,34 @@
           :send-action t)
     ))
 
+(defun init-obstacle ()
+  (let* ((door-width 821.0)
+        (h-step (/ door-width 4))
+        (v-step (/ door-width 4))
+        cube-list)
+
+
+    (dotimes (p 4)
+      (dotimes (q 12)
+        (let (c) 
+          (setq c (make-cube 100 100 200))
+          (send c :translate (send *door* :worldpos))
+          (send c :translate #f(0 0 100))
+          (send c :translate (float-vector (- (+ door-width (/ v-step 2))) (/ h-step 2) 0))
+          (send c :translate (float-vector (- (* p v-step)) (- (* 3 h-step) (* q h-step)) 0))
+          (push c cube-list))))
+
+    (dotimes (p 4)
+      (dotimes (q 4)
+        (let (c) 
+          (setq c (make-cube 100 100 200))
+          (send c :translate (send *door* :worldpos))
+          (send c :translate #f(0 0 100))
+          (send c :translate (float-vector (- (+ door-width (/ v-step 2))) (/ h-step 2) 0))
+          (send c :translate (float-vector (* (+ 1 p) v-step) (- (+ (* 5 h-step) (* q h-step))) 0))
+          (push c cube-list))))
+
+    (setq *obs-list* (reverse cube-list))))
+        
+
+    

@@ -107,7 +107,7 @@
                        )
                       additional-weight-list
                       )
-                     :link-list (car ll) ;; link-list
+                     :link-list ll ;; link-list
                      :move-target move-target
                     args)))
       (t

@@ -43,6 +43,8 @@
 ;;     overload))
 
 (defun colide-obstacle? (n)
+  (unless *obs*
+    (return-from colide-obstacle? nil))
   (if (send n :get-value :robot-pose-optimized)
       (progn
         (send *pr2* :angle-vector (send n :get-value :robot-pose-optimized))
