@@ -34,7 +34,8 @@
             (progn
               (setq idx (position (send l :joint) (send *pr2* :joint-list) :test #'equal))
               (setf (elt tau i) (elt tau-tmp idx))
-              (setf (elt tmp-W i) (abs (/ (elt tau-tmp idx) (elt (send *pr2* :max-torque-vector) idx))))
+              ;; (setf (elt tmp-W i) (abs (/ (elt tau-tmp idx) (elt (send *pr2* :max-torque-vector) idx))))
+              (setf (elt tmp-W i) (abs (/ 1 (* (elt (send *pr2* :max-torque-vector) idx) (elt (send *pr2* :max-torque-vector) idx)))))
               ;; (setf (elt tmp-W i) 0.0)
               (incf i)))
           )))
@@ -51,7 +52,8 @@
         (dolist (l ll)
           (setq idx (position (send l :joint) (send *pr2* :joint-list) :test #'equal))
           (setf (elt tau i) (elt tau-tmp idx))
-          (setf (elt tmp-W i) (abs (/ (elt tau-tmp idx) (elt (send *pr2* :max-torque-vector) idx))))
+          ;; (setf (elt tmp-W i) (abs (/ (elt tau-tmp idx) (elt (send *pr2* :max-torque-vector) idx))))
+          (setf (elt tmp-W i) (abs (/ 1 (* (elt (send *pr2* :max-torque-vector) idx) (elt (send *pr2* :max-torque-vector) idx)))))
 ;;          (setf (elt tmp-W i) 0.0)
           (incf i)))))
 
@@ -74,7 +76,7 @@
    (setq *tau-tmp* tau-tmp)
    (setq *tau* tau)
    
-  ;; (setq tmp-W #f(0 0 0 0 0 0 0 0 0 1 0))
+  ;; (setq tmp-W #f(0 0 0 0 1 0 0 0 0 0 0))
    ;; (if use-base 
    ;;     (setq tmp-W #f(0 0 0 0 1 0 0 0))
    ;;   (setq tmp-W #f(0 1 0 0 0)))
@@ -86,7 +88,7 @@
    (dotimes (i (reduce '+ (send-all (send-all ll :joint) :joint-dof)))
      (let ((mr (matrix-row dtau/dq i)))
        (if use-base
-           (setf (elt mr 2) (* 0.0 (elt mr 2))))
+           (setf (elt mr 2) (* 0.01 (elt mr 2))))
 ;;     (print (norm (scale (elt tau i) (matrix-row dtau/dq i))))
      ;; (setq z (v+ z (scale (* (elt tmp-W i) (elt tau i)) (matrix-row dtau/dq i)))))
      (setq z (v+ z (scale (elt tmp-W i) (normalize-vector (scale (elt tau i) mr)))))))
@@ -101,7 +103,7 @@
    ;; (setf (elt z 2) 0)
 ;;   (setf (elt z 3) 0)
    (setq *z* z)
-;;   (push tau-tmp *torque*)
+  ;; (push tau-tmp *torque*)
  ;; (setq z (transform W (v+ (scale 0.5 (transform (transpose dtau/dq) tau)) (scale 0.5 (transform tau dtau/dq)))))
    ;; (print z)
    z))
