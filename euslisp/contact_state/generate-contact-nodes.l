@@ -1,13 +1,6 @@
 (load "extended-graph.l")
 (load "graph-rule.l")
 
-(setq *all-nodes* nil)
-(setq *bridge-nodes* nil)
-(setq *start-nodes* nil) ;;temporary
-(setq *solvable-nodes* nil)
-(setq *door-rot-step* 20)
-(setq *graph-depth* 5)
-(setq *ik-target-shift* #f(50 0 0)) ;;;target coords of IK shift from door plane
 (setq debugview-colli nil)
 (setq debugview-mintq nil)
 (setq debugview-bridge nil)
@@ -212,7 +205,7 @@
           (send n :put-value :contact-point-index 0)
           (send n :put-value :contact-point (elt (set-contact-points (send n :get-value :arm)) 0))
           (send n :put-value :contact-type 'grasp)
-          (send n :put-value :graph-depth 's)
+          (send n :put-value :graph-depth -1)
           (send n :put-value :door-angle (* 0 (* -1 *door-rot-step*)))
           ;; ;                  (send n :put-value :pose-idx k)
           (send n :put-value :solved nil)
@@ -240,13 +233,23 @@
     
     (send *pr2* :move-to (make-coords) :world)
     (send *pr2* :reset-pose)
+    
+    (let (nb-solved 
+          upper-n)
+      (dolist (nb-n (get-target-neighbour-nodes n)) ;;if neighbour nodes solved, start from that pose to reduce IK solving time
+        (if (and (send nb-n :get-value :solved) (send nb-n :get-value :robot-pose))
+            (progn
+              (setq nb-solved t)
+              (send *pr2* :angle-vector (send nb-n :get-value :robot-pose))
+              (send *pr2* :move-to (send nb-n :get-value :base-coords) :world)
+              (return))))
 
-    (dolist (nb-n (get-target-neighbour-nodes n)) ;;if neighbour nodes solved, start from that pose to reduce IK solving time
-      (if (and (send nb-n :get-value :solved) (send nb-n :get-value :robot-pose))
-          (progn
-            (send *pr2* :angle-vector (send nb-n :get-value :robot-pose))
-            (send *pr2* :move-to (send nb-n :get-value :base-coords) :world)
-            (return))))
+      (unless nb-solved
+        (setq upper-n (get-node (format nil "~A-~A-~A-~A" (if (equal (send n :get-value :arm) :rarm) 'r 'l) (send n :get-value :contact-point-index) (- (send n :get-value :graph-depth) 1) (send n :get-value :object-coords-index))))
+        (if (and upper-n (send upper-n :get-value :solved) (send upper-n :get-value :robot-pose)) ;;upper rank node
+            (progn 
+              (send *pr2* :angle-vector (send upper-n :get-value :robot-pose))
+              (send *pr2* :move-to (send upper-n :get-value :base-coords) :world)))))
 
     (send n :put-value :solved t)
     (send n :put-value :robot-pose nil)
@@ -261,7 +264,8 @@
            (res (send *pr2* :inverse-kinematics tgt-cds
                       :move-target contact-pt
                       :link-list (send *pr2* :link-list (send contact-pt :parent))
-;;                      :stop 1000
+                       :stop 100
+                      :min-loop 5
                       :collision-avoidance-link-pair (door-arm-base-collision-link-pair contact-pt :use-base t :include-knob (if (eq (send n :get-value :contact-type) 'grasp) nil t))
                       :avoid-collision-distance 50
                       :avoid-collision-joint-gain 3.0
@@ -302,7 +306,9 @@
                         :move-target contact-pt
                         :link-list (send *pr2* :link-list (send contact-pt :parent))
                         :collision-avoidance-link-pair (door-arm-base-collision-link-pair contact-pt :use-base t :include-knob (if (eq (send n :get-value :contact-type) 'grasp) nil t))
-                        :stop 500
+                        ;; :stop 500
+                        :stop 50
+                        :min-loop 50
                         :avoid-collision-distance 50
                         :avoid-collision-joint-gain 5.0
                         :avoid-collision-null-gain 800.0
