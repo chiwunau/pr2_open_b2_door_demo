@@ -1,8 +1,8 @@
-(defclass door
+(defclass rotational-door
   :super cascaded-link
   :slots (rear-knob-coords front-knob-coords end-coords l1 l2 l3 j1 j2 door-radius door-width door-thickness knob-height knob-radius front-touch-cds-list rear-touch-cds-list h-tgts-num v-tgts-num h-step v-step))
 
-(defmethod door
+(defmethod rotational-door
   (:init (door-radius knob-height knob-radius)
 	 (let (b)
            (setq door-width (+ door-radius (+ (/ 130 2) 78)))
@@ -156,7 +156,9 @@
 (defun make-door ()
   ;; (setq *door* (instance door :init 700 1000 50))
   ;; (send *door* :translate #f(700 700 0))
-  (setq *door* (instance door :init 678 945 (/ 130 2)))
-  (send *door* :translate #f(700 700 0))
-  (send *irtviewer* :objects *door*)
-  (send *irtviewer* :objects (append ( send *irtviewer* :objects) (send *door* :get-rear-touch-cds-list))))
+  (let (d)
+  (setq d (instance rotational-door :init 678 945 (/ 130 2)))
+  (send d :translate #f(700 700 0))
+  ;; (send *irtviewer* :objects *door*)
+  ;; (send *irtviewer* :objects (append ( send *irtviewer* :objects) (send *door* :get-rear-touch-cds-list)))
+  d))

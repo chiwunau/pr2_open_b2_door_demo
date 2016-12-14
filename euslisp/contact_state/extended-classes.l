@@ -27,6 +27,9 @@
 
 
 (defmethod pr2-robot
+  ;; (:get-virtual-link-list 
+  ;;  ()
+  ;;  link-list-with-virtual-link)
   (:inverse-kinematics
    (target-coords &rest args &key (link-list) (move-arm)
                   (use-torso t) (move-target) (stop 300)
@@ -84,32 +87,37 @@
                           (send start-coords :difference-position self)
                           (send start-coords :difference-rotation self)))
        (send self :move-to start-coords :world)
-       (with-append-root-joint
-        (ll self link-list
-            :joint-class omniwheel-joint
-            :joint-args base-range)
-        (send (caar ll) :joint :joint-angle
-              (float-vector (elt diff-pos-rot 0)
-                            (elt diff-pos-rot 1)
-                            (rad2deg (elt diff-pos-rot 5))))
-        (setq *link-list-with-virtual-link* ll) ;;for calc-dtau-dtheta ;;au
-        (send-super* :inverse-kinematics target-coords
-                     :rthre rthre
-                     :thre thre
-                     :stop stop
-                     :additional-weight-list
-                     (append
-                      (list
-                       (list (send self :torso_lift_joint :child-link)
-                             (if (numberp use-torso) use-torso 0.005))
-                       (list (car (send self :links))
-                             (if (eq use-base t) 0.1 use-base))
-                       )
-                      additional-weight-list
-                      )
-                     :link-list ll ;; link-list
-                     :move-target move-target
-                    args)))
+       (let ((res (with-append-root-joint
+                   (ll self link-list
+                       :joint-class omniwheel-joint
+                       :joint-args base-range)
+                   (send (caar ll) :joint :joint-angle
+                         (float-vector (elt diff-pos-rot 0)
+                                       (elt diff-pos-rot 1)
+                                       (rad2deg (elt diff-pos-rot 5))))
+                   ;; (setq link-list-with-virtual-link ll)
+                   (send self :put :link-list-with-virtual-link ll)
+                   ;; (setq link-list-with-virtual-link ll) ;;for calc-dtau-dtheta ;;au
+                   (send-super* :inverse-kinematics target-coords
+                                :rthre rthre
+                                :thre thre
+                                :stop stop
+                                :additional-weight-list
+                                (append
+                                 (list
+                                  (list (send self :torso_lift_joint :child-link)
+                                        (if (numberp use-torso) use-torso 0.005))
+                                  (list (car (send self :links))
+                                        (if (eq use-base t) 0.1 use-base))
+                                  )
+                                 additional-weight-list
+                                 )
+                                :link-list ll ;; link-list
+                                :move-target move-target
+                                args))))
+         (send self :remprop :link-list-with-virtual-link)
+         res)
+       )
       (t
        (send-super* :inverse-kinematics target-coords
                     :rthre rthre

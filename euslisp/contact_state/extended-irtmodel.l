@@ -43,8 +43,8 @@
 
    (:calc-joint-angle-speed-gain
    (union-link-list dav periodic-time)
-   (setq *ullj* (send-all union-link-list :joint))
-   (setq *ull* union-link-list)
+   ;; (setq *ullj* (send-all union-link-list :joint))
+   ;; (setq *ull* union-link-list)
    (let* ((fik-len (send self :calc-target-joint-dimension union-link-list))
 	  (av (instantiate float-vector fik-len)) j)
      (do* ((i 0 (+ i (send j :joint-dof)))
