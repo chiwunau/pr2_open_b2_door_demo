@@ -169,7 +169,7 @@
 ;;           (print res)
 
             (when res
-              (let ((n (instance extended-node :init (format nil "~A<->-~A"
+              (let ((n (instance extended-node :init (format nil "~A<->~A"
                                                              (send rn :name) (send ln :name)))))
                     
                 (send n :put-value :arm :arms)

@@ -122,5 +122,9 @@
 (defun get-node (name)
   (let ((p (position name (send-all *all-nodes* :name) :test 'equal)))
     (if p
-        (elt *all-nodes* p))))
+        (elt *all-nodes* p)
+      (progn
+        (setq p (position name (send-all *bridge-nodes* :name) :test 'equal))
+        (if p
+            (elt *bridge-nodes* p))))))
 
