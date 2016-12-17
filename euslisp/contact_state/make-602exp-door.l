@@ -1,52 +1,52 @@
-(defclass rotational-door
+(defclass 602exp-door
   :super cascaded-link
   :slots (rear-knob-coords front-knob-coords end-coords l1 l2 l3 j1 j2 door-radius door-width door-thickness knob-height knob-radius front-touch-cds-list rear-touch-cds-list h-tgts-num v-tgts-num h-step v-step))
 
-(defmethod rotational-door
+(defmethod 602exp-door
   (:init (door-radius knob-height knob-radius)
 	 (let (b)
-           (setq door-width (+ door-radius (+ (/ 130 2) 78)))
+           (setq door-width (+ door-radius (+ knob-radius 50)))
            (setq door-thickness 50)
 	   (send-super :init)
 	   (setq b (make-cube 30 (* 2 knob-radius) 15))
 	   (send b :locate (float-vector 0 knob-radius 0))
 	   (send b :set-color :red)
 	   (setq l3 (instance bodyset-link :init (make-cascoords) :bodies (list b) :name 'front-knob))
-	   (setq end-coords (make-cascoords :pos (float-vector 0 knob-radius 0)))
-           (setq front-knob-coords (make-cascoords :coords (send end-coords :copy-worldcoords) :name "front-knob-coords"))
+           (setq front-knob-coords (make-cascoords :coords (send (send l3 :copy-worldcoords) :translate 
+                                                                 (float-vector 0 knob-radius 0))
+                                                   :name "front-knob-coords"))
            (send l3 :assoc front-knob-coords)
-	   (send l3 :assoc end-coords)
+	   ;; (send l3 :assoc end-coords)
 	   ;; (send l3 :locate (float-vector (+ 25 (- (+ 50 (/ 25 2.0))))  (* -1 door-radius) knob-height))
-	   (send l3 :locate (float-vector (* -1 (+ 60 (/ door-thickness 2)))  (* -1 door-radius) knob-height))
-
-
+	   (send l3 :locate (float-vector (* -1 (+ 50 (/ door-thickness 2)))  (* -1 door-radius) knob-height))
+           
+           
            (setq b (make-cube 30 (* 2 knob-radius) 15))
 	   (send b :locate (float-vector 0 knob-radius 0))
            (send b :set-color :red)
            (setq l4 (instance bodyset-link :init (make-cascoords) :bodies (list b) :name 'rear-knob))
            ;; (send l4 :locate (float-vector (+ 25 125 (- (+ 50 (/ 25 2.0))))  (* -1 door-radius) knob-height))
-           (send l4 :locate (float-vector (+ 60 (/ door-thickness 2)) (* -1 door-radius) knob-height))
-           (setq rear-knob-coords (make-cascoords :pos (float-vector (+ 25 125 (- (+ 50 (/ 25 2.0))))  (+ (* -1 door-radius) knob-radius) knob-height) :name "rear-knob-coords"))
+           (send l4 :locate (float-vector (+ 50 (/ door-thickness 2)) (* -1 door-radius) knob-height))
+           (setq rear-knob-coords (make-cascoords :coords (send (send l4 :copy-worldcoords) :translate
+                                                                (float-vector 0 knob-radius 0))
+                                                  :name "rear-knob-coords"))
            (send l4 :assoc rear-knob-coords)
            (send l3 :assoc l4)
 
 	   
 	   (setq b (make-cube 50 door-width (* 2 knob-height)))
 	   ;; (send b :locate (float-vector 25 (/ (+ door-radius 95) -2.0) knob-height))
-	   (send b :locate (float-vector 25 (/ door-width -2.0) knob-height))
+	   (send b :locate (float-vector 0 (/ door-width -2.0) knob-height))
 	   (send b :set-color :yellow 0.8)
 	   (setq l2 (instance bodyset-link :init (make-cascoords) :bodies (list b) :name 'door-plate))
 	   (send l2 :assoc l3)
-	   ;; (send l2 :locate #f(0 -25 0))
-	   (send l2 :locate #f(0 0 0))
+	   (send l2 :translate (float-vector (/ door-thickness 2) (/ door-thickness -2) 0))
            
            (setq b (make-cube 50 door-width (* 2 knob-height)))
-           (send b :locate (float-vector 25 (* 3 (/ door-width -2.0)) knob-height))
+           (send b :locate (float-vector 0 (* 3 (/ door-width -2.0)) knob-height))
 	   (send b :set-color :grey 0.8)
 	   (setq l5 (instance bodyset-link :init (make-cascoords) :bodies (list b) :name 'wall))
-                                        ;	   (send l5 :assoc l3)
-	   ;; (send l5 :locate #f(0 -25 0))
-	   (send l5 :locate #f(0 0 0))
+	   (send l5 :translate (float-vector (/ door-thickness 2) (/ door-thickness -2) 0))
 	   
 	   (setq b (make-cube 50 50 (* 2 knob-height)))
 	   (send b :locate (float-vector 0 0 knob-height))
@@ -93,7 +93,7 @@
          (send cds :translate (float-vector 0 (- door-width) (* 1.25 knob-height)))
          (send cds :rotate pi :z)
          (send cds :translate (float-vector 10 (- (* i y-step) y-offset) (- (* j z-step))))
-         (send (send (send self :end-coords :parent) :parent) :assoc cds)
+         (send (elt (send self :links) 1) :assoc cds) ;;assoc to door-plane link
          (push cds cds-list)))
      (setq front-touch-cds-list cds-list)
      (setq front-touch-cds-list (reverse front-touch-cds-list))
@@ -114,7 +114,7 @@
          (setq cds (make-cascoords))
          (send cds :translate (float-vector (+ 10 door-thickness) (- door-width) (* 1.4 knob-height)))
          (send cds :translate (float-vector 0 (+ (* i h-step) h-offset) (- (* j v-step))))
-         (send (send (send self :end-coords :parent) :parent) :assoc cds)
+         (send (elt (send self :links) 1) :assoc cds) ;;assoc to door-plane link
          (push cds cds-list)))
      (setq rear-touch-cds-list cds-list)
      (setq rear-touch-cds-list (reverse rear-touch-cds-list))
@@ -153,11 +153,11 @@
 
 
 
-(defun make-door ()
+(defun make-602exp-door ()
   ;; (setq *door* (instance door :init 700 1000 50))
   ;; (send *door* :translate #f(700 700 0))
   (let (d)
-  (setq d (instance rotational-door :init 678 945 (/ 130 2)))
+  (setq d (instance 602exp-door :init 646 920 (/ 100 2)))
   (send d :translate #f(700 700 0))
   ;; (send *irtviewer* :objects *door*)
   ;; (send *irtviewer* :objects (append ( send *irtviewer* :objects) (send *door* :get-rear-touch-cds-list)))

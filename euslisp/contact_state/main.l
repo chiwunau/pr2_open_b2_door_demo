@@ -1,6 +1,7 @@
 (unless (boundp '*pr2*)
   (load "package://pr2eus/pr2-interface.l"))
-(load "make-door.l")
+(load "make-73b2-door.l")
+(load "make-602exp-door.l")
 ;;(load "search-motion.l")
 (load "generate-contact-nodes.l")
 (load "generate-transition-graph.l")
@@ -27,7 +28,8 @@
     (pr2))
  ;; (setq *pr2* (instance extended-pr2-sensor-robot :init)))
   (objects *pr2*)
-  (setq *door* (make-door))
+  ;; (setq *door* (make-73b2-door))
+  (setq *door* (make-602exp-door))
   (objects *door*)
   (send *irtviewer* :objects (append ( send *irtviewer* :objects) (send *door* :get-rear-touch-cds-list)))
   ;;temp fix for bug where collisiion model does not update
@@ -93,47 +95,47 @@
 ;;     ))
 
 
-(init-obstacle)
-(send *irtviewer* :objects (append (send *irtviewer* :objects) *obs-list*))
-(setq *path-list* (make-list (length *obs-list*)))
+;; (init-obstacle)
+;; (send *irtviewer* :objects (append (send *irtviewer* :objects) *obs-list*))
+;; (setq *path-list* (make-list (length *obs-list*)))
 
-(do ((i 25 (+ i 1)))  ((>= i (length *obs-list*)))
-    (setq *obs* (elt *obs-list* i))
-    (bench (init-graph))
-    (if (send *graph* :node "l-0-s-fk")
-        (progn
-          (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
-          (solve-graph)
-          (if *path*
-            (progn (setf (elt *path-list* i) *path*)
-                   (send *obs* :set-color :green))
-            (progn
-              ;; (push nil *path-list*)
-              (send *obs* :set-color :red))))
-      (progn
-        ;; (push nil *path-list*)
-        (send *obs* :set-color :red)))
-    (send *irtviewer* :draw-objects))
-
-
-
-(dotimes (i (length *path-list*))
-  (when (elt *path-list* i)
-    (send (elt *obs-list* i) :set-color :yellow)
-    (play-path (elt *path-list* i))
-    (send (elt *obs-list* i) :set-color :green)))
+;; (do ((i 25 (+ i 1)))  ((>= i (length *obs-list*)))
+;;     (setq *obs* (elt *obs-list* i))
+;;     (bench (init-graph))
+;;     (if (send *graph* :node "l-0-s-fk")
+;;         (progn
+;;           (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
+;;           (solve-graph)
+;;           (if *path*
+;;             (progn (setf (elt *path-list* i) *path*)
+;;                    (send *obs* :set-color :green))
+;;             (progn
+;;               ;; (push nil *path-list*)
+;;               (send *obs* :set-color :red))))
+;;       (progn
+;;         ;; (push nil *path-list*)
+;;         (send *obs* :set-color :red)))
+;;     (send *irtviewer* :draw-objects))
 
 
-(dotimes (i (length *path-list*))
-  (unless (elt *path-list* i)
-    (setq *obs* (elt *obs-list* i))
-    (bench (init-graph))
-    (send *graph* :start-state (send *graph* :node "r-0-s-fk"))
-    (solve-graph)
-    (if *path*
-        (progn
-          (setf (elt *path-list* i) *path*)
-          (send (elt *obs-list* i) :set-color :green))
-      (send (elt *obs-list* i) :set-color :red))))
+
+;; (dotimes (i (length *path-list*))
+;;   (when (elt *path-list* i)
+;;     (send (elt *obs-list* i) :set-color :yellow)
+;;     (play-path (elt *path-list* i))
+;;     (send (elt *obs-list* i) :set-color :green)))
+
+
+;; (dotimes (i (length *path-list*))
+;;   (unless (elt *path-list* i)
+;;     (setq *obs* (elt *obs-list* i))
+;;     (bench (init-graph))
+;;     (send *graph* :start-state (send *graph* :node "r-0-s-fk"))
+;;     (solve-graph)
+;;     (if *path*
+;;         (progn
+;;           (setf (elt *path-list* i) *path*)
+;;           (send (elt *obs-list* i) :set-color :green))
+;;       (send (elt *obs-list* i) :set-color :red))))
 
   
