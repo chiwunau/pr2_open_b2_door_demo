@@ -19,7 +19,7 @@
 (setq *start-nodes* nil) ;;temporary
 (setq *solvable-nodes* nil)
 (setq *door-rot-step* 20)
-(setq *graph-depth* 5)
+(setq *graph-depth* 6) ;;0 20 40 60 80 100
 (setq *ik-target-shift* #f(50 0 0)) ;;;target coords of IK shift from door plane
 
 
