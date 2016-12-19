@@ -7,8 +7,9 @@
 (load "generate-transition-graph.l")
 (load "extract-motion.l")
 (load "extended-classes.l")
-(load "extended-irtmodel.l")
+;; (load "extended-irtmodel.l")
 (load "extended-graph.l")
+(load "graph-rule.l")
 (load "calc-dtau-dtheta.l")
 (load "write-load-data.l")
 ;; (load "~/ros/hydro/src/jsk-ros-pkg/euslib/rbrain/virtual_interpolator.l")
@@ -67,15 +68,14 @@
 (defun test-graph()
   (init)
   ;; (load "data/nodes-data-2016-11-12-long-ver2.dat")
-  (load "data/nodes-data-2016-12-13-new.dat")
+  ;; (load "data/nodes-data-2016-12-18-602expdoor.dat")
+  (load "data/nodes-data-2016-12-18-73b2door.dat")
   (update-loaded-nodes) ;;put dependence in to coords
   (get-solvable-nodes)
-  (init-start-nodes) ;;init grasp nodes of both arms
-  (robot-pose-sampling :nodes *start-nodes*)
   (setq *obs* nil)
   (init-nodes-torque-info :door-weight 5)
   (bench (init-graph))
-  (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
+  ;; (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
   (clear-zero-relation-nodes *graph*)
   )
 
@@ -99,25 +99,21 @@
 ;; (send *irtviewer* :objects (append (send *irtviewer* :objects) *obs-list*))
 ;; (setq *path-list* (make-list (length *obs-list*)))
 
-;; (do ((i 25 (+ i 1)))  ((>= i (length *obs-list*)))
+;; (do ((i 0 (+ i 1))) ((>= i (length *obs-list*)))
 ;;     (setq *obs* (elt *obs-list* i))
 ;;     (bench (init-graph))
-;;     (if (send *graph* :node "l-0-s-fk")
-;;         (progn
-;;           (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
-;;           (solve-graph)
-;;           (if *path*
-;;             (progn (setf (elt *path-list* i) *path*)
-;;                    (send *obs* :set-color :green))
-;;             (progn
-;;               ;; (push nil *path-list*)
-;;               (send *obs* :set-color :red))))
+;;     ;; (if (send *graph* :node "l-0-s-fk")
+;;     ;;     (progn
+;;     ;;       (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
+;;     (solve-graph)
+;;     (if *path*
+;;         (progn (setf (elt *path-list* i) *path*)
+;;                (send *obs* :set-color :green))
 ;;       (progn
 ;;         ;; (push nil *path-list*)
 ;;         (send *obs* :set-color :red)))
-;;     (send *irtviewer* :draw-objects))
-
-
+;;     (send *irtviewer* :draw-objects)
+;;     )
 
 ;; (dotimes (i (length *path-list*))
 ;;   (when (elt *path-list* i)

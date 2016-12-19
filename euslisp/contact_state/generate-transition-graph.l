@@ -79,13 +79,13 @@
                (send n :get-value :base-coords))
               :both t))))
 
-  (when (member (get-node "r-0-0-fk") (send graph :nodes))
-    (send graph :add-node (car *start-nodes*))
-    (send graph :add-arc (car *start-nodes*) (get-node "r-0-0-fk") 1 :both nil))
+  ;; (when (member (get-node "r-0-0-fk") (send graph :nodes))
+  ;;   (send graph :add-node (car *start-nodes*))
+  ;;   (send graph :add-arc (car *start-nodes*) (get-node "r-0-0-fk") 1 :both nil))
 
-  (when (member (get-node "l-0-0-fk") (send graph :nodes))
-    (send graph :add-node (cadr *start-nodes*))
-    (send graph :add-arc (cadr *start-nodes*) (get-node "l-0-0-fk") 1 :both nil))
+  ;; (when (member (get-node "l-0-0-fk") (send graph :nodes))
+  ;;   (send graph :add-node (cadr *start-nodes*))
+  ;;   (send graph :add-arc (cadr *start-nodes*) (get-node "l-0-0-fk") 1 :both nil))
 
   (setq *graph* graph)
   (set-start-goal-state)
@@ -197,11 +197,11 @@
     ))
 
 (defun init-obstacle ()
-  (let* ((door-width 821.0)
-        (h-step (/ door-width 4))
-        (v-step (/ door-width 4))
-        cube-list)
-
+  (let* ((door-width (elt (send (car (send (elt (send *door* :links) 1) :bodies)) :body-type) 2))
+         (h-step (/ door-width 4))
+         (v-step (/ door-width 4))
+         cube-list)
+    
 
     (dotimes (p 4)
       (dotimes (q 12)
@@ -221,6 +221,16 @@
           (send c :translate #f(0 0 100))
           (send c :translate (float-vector (- (+ door-width (/ v-step 2))) (/ h-step 2) 0))
           (send c :translate (float-vector (* (+ 1 p) v-step) (- (+ (* 5 h-step) (* q h-step))) 0))
+          (push c cube-list))))
+
+    (dotimes (p 4)
+      (dotimes (q 4)
+        (let (c) 
+          (setq c (make-cube 100 100 200))
+          (send c :translate (send *door* :worldpos))
+          (send c :translate #f(0 0 100))
+          (send c :translate (float-vector (- (+ door-width (/ v-step 2))) (/ h-step 2) 0))
+          (send c :translate (float-vector (* (+ 1 p) v-step) (- (+ (* -3 h-step) (* q h-step))) 0))
           (push c cube-list))))
 
     (setq *obs-list* (reverse cube-list))))

@@ -53,10 +53,12 @@
   (send *irtviewer* :viewer :flush))
 
 
-(dolist (n *all-node*)
-  (play-node n)
+(dolist (n *solvable-nodes*)
+  (if (send n :get-value :optimized)
+      (play-node n :optimized t)
+    (play-node n :optimized nil))
   (dotimes (i 90) ;;make sure robot's arm do not collide with rear knob
-    (let ((res (pqp-collision-check-objects (send *pr2* (send n :get :arm)  :links) (send *door* :links))))
+    (let ((res (pqp-collision-check-objects (send *pr2* (send n :get-value :arm)  :links) (send *door* :links))))
       (if res
           (progn (print "colli")
                  (return))
@@ -66,8 +68,59 @@
 ;;    (send *irtviewer* :draw-objects)
   ))
 
+(let ((i 0))
+  (dolist (n *solvable-nodes*)
+    (if (send n :get-value :optimized)
+        (play-node n :optimized t)
+      (play-node n :optimized nil))
+    (let ((res (pqp-collision-check-objects 
+                      (append (list (send *pr2* :base_footprint_lk)) (send *pr2* :link-list (send (send n :get-value :contact-point) :parent)))
+                      (if (eq (send n :get-value :contact-type) 'grasp)
+                          (remove-if #'(lambda (x) (substringp "knob" (string (send x :name)))) (send *door* :links))
+                        (send *door* :links)))))
+      (if res
+          (progn (print "colli")
+                 (print i)
+                 (return))))
+    (incf i)
+    (unix:usleep (* 1000 50)))
+    ;;    (send *irtviewer* :draw-objects)
+    ))
 
-122506496
+(let ((i 0))
+  (dolist (n *bridge-nodes*)
+    (if (send n :get-value :optimized)
+        (play-node n :optimized t)
+      (play-node n :optimized nil))
+    (incf i)
+       (send *irtviewer* :draw-objects)
+    ))
+
+(let ((i 0))
+  (dolist (n *bridge-nodes*)
+    ;; (if (send n :get-value :optimized)
+    ;;     (play-node n :optimized t)
+    ;;   (play-node n :optimized nil))
+    (if (and (eq (send (get-node (car (send n :get-value :islands))) :get-value :contact-point-index) 0)
+             ;; (eq (send (get-node (cadr (send n :get-value :islands))) :get-value :contact-point-index) 2)
+             (eq (send (get-node (cadr (send n :get-value :islands))) :get-value :contact-type) 'grasp)
+             )
+        (progn
+          (push n hoge2)
+          ;; (return)
+          ))
+    (incf i)
+    ;;    (send *irtviewer* :draw-objects)
+    ))
+
+  
+(dolist (n *bridge-nodes*)
+  (if (or (equal (car (send n :get-value :islands)) "r-0-2-16")
+          (equal (cadr (send n :get-value :islands)) "r-0-2-16"))
+      (print n)))
+
+
+
 
 (- (length *all-node*) (count t (send-all *all-node* :get :overload?)))
 
@@ -156,24 +209,27 @@ all-node, 787 nodes
   )
 ;;--------------------------------------plot optimized torque comparision--------------------------------------------;;
 (dolist (n *solvable-nodes*)
+  ;; (print n)
   (unless (send n :get-value :islands)
     (let ((tau (calc-robot-torque n :optimized nil :door-weight 5))
-          (opt-tau (if (send n :get-value :robot-pose-optimized) (calc-robot-torque n :optimized t :door-weight 5) nil)))
+          (opt-tau (if (send n :get-value :robot-pose-optimized) (calc-robot-torque n :optimized t :door-weight 5) nil))
+          (min-ratio 1)
+          )
 
       (let* ((name "norm")
-             (new1? (not (probe-file (format nil "2016-11-13/_~A_~A_org.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name))))
-             (new2? (not (probe-file (format nil "2016-11-13/_~A_~A_opt.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name))))
-             (new3? (not (probe-file (format nil "2016-11-13/_~A_norm_ratio.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r)))))
+             (new1? (not (probe-file (format nil "dtau_com/_~A_~A_org.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name))))
+             (new2? (not (probe-file (format nil "dtau_com/_~A_~A_opt.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name))))
+             (new3? (not (probe-file (format nil "dtau_com/_~A_norm_ratio.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r)))))
                     
-             (f1 (open (format nil "2016-11-13/_~A_~A_org.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name)
+             (f1 (open (format nil "dtau_com/_~A_~A_org.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name)
                        :direction :output
                        :if-exists :append
                        :if-does-not-exist :create))
-             (f2 (open (format nil "2016-11-13/_~A_~A_opt.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name)
+             (f2 (open (format nil "dtau_com/_~A_~A_opt.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r) name)
                        :direction :output
                        :if-exists :append
                        :if-does-not-exist :create))
-             (f3 (open (format nil "2016-11-13/_~A_norm_ratio.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r))
+             (f3 (open (format nil "dtau_com/_~A_norm_ratio.txt" (if (eq (send n :get-value :arm) :larm) 'l 'r))
                        :direction :output
                        :if-exists :append
                        :if-does-not-exist :create)))
@@ -187,7 +243,13 @@ all-node, 787 nodes
              (when opt-tau
                (format f1 "~A~%" (norm tau))
                (format f2 "~A~%" (norm opt-tau))
-               (format f3 "~A~%" (/ (norm opt-tau) (norm tau))))
+               (format f3 "~A~%" (/ (norm opt-tau) (norm tau)))
+
+               (if (and (eq (send n :get-value :arm) :rarm) (eq (send n :get-value :contact-point-index) 0))
+                   (if (< (/ (norm opt-tau) (norm tau)) min-ratio)
+                       (progn (setq min-ratio (/ (norm opt-tau) (norm tau)))
+                              (setq min-idx (position n *solvable-nodes*)))))
+               )
 
              (close f1)
              (close f2)
@@ -196,13 +258,13 @@ all-node, 787 nodes
       
       (dotimes (i 7)
         (let* ((name (send (elt (send *pr2* :joint-list) (if (equal :larm (send n :get-value :arm)) (+ 1 i) (+ 8 i))) :name))
-               (new1? (not (probe-file (format nil "2016-11-13/~A_~A_org.txt" i name))))
-               (new2? (not (probe-file (format nil "2016-11-13/~A_~A_opt.txt" i name))))
-               (f1 (open (format nil "2016-11-13/~A_~A_org.txt" i name)
+               (new1? (not (probe-file (format nil "dtau_com/~A_~A_org.txt" i name))))
+               (new2? (not (probe-file (format nil "dtau_com/~A_~A_opt.txt" i name))))
+               (f1 (open (format nil "dtau_com/~A_~A_org.txt" i name)
                         :direction :output
                         :if-exists :append
                         :if-does-not-exist :create))
-               (f2 (open (format nil "2016-11-13/~A_~A_opt.txt" i name)
+               (f2 (open (format nil "dtau_com/~A_~A_opt.txt" i name)
                         :direction :output
                         :if-exists :append
                         :if-does-not-exist :create)))
@@ -215,7 +277,83 @@ all-node, 787 nodes
         (when opt-tau
           (format f1 "~A~%" (elt tau (if (equal :larm (send n :get-value :arm)) (+ 1 i) (+ 8 i))))
           (format f2 "~A~%" (elt opt-tau (if (equal :larm (send n :get-value :arm)) (+ 1 i) (+ 8 i)))))
-          
+        
         (close f1)
         (close f2))))))
 ;;---------------------------------------------------------------------------------------------------------------------------;;
+
+(dump-loadable-structure "data/nodes-data-dtau_com.dat" *all-nodes* *bridge-nodes*)
+
+
+
+
+(defun draw-arm (&optional (arm :larm))
+  (send *irtviewer* :objects (send *pr2* arm :links))
+  (dolist (l (send *pr2* arm :links))
+    (send *irtviewer* :objects (append (send *irtviewer* :objects) (send *pr2* :get-redundant-links l)))))
+
+(dotimes (i (length cs))
+  (setq c (make-sphere 20))
+  (send c :set-color :black)
+  (send c :translate (send (elt cs i) :worldpos))
+  (objects c))
+
+
+
+;;----------------------------------test obstacle------------------------------------;;
+(dolist (n *all-nodes*)
+  (when (eq (send n :get-value :contact-point-index) 1)
+    (print n)
+    (robot-pose-sampling :nodes (list n))
+    ))
+
+(get-solvable-nodes)
+
+(dolist (n *all-nodes*)
+  (unless (member n *solvable-nodes*)
+    (print n)
+    (robot-pose-sampling :nodes (list n))
+    ))
+
+
+(init-obstacle)
+(send *irtviewer* :objects (append (send *irtviewer* :objects) *obs-list*))
+(setq *path-list* (make-list (length *obs-list*)))
+
+(do ((i 0 (+ i 1))) ((>= i (length *obs-list*)))
+    (setq *obs* (elt *obs-list* i))
+    (bench (init-graph))
+    ;; (if (send *graph* :node "l-0-s-fk")
+    ;;     (progn
+    ;;       (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
+    (solve-graph)
+    (if *path*
+        (progn (setf (elt *path-list* i) *path*)
+               (send *obs* :set-color :green))
+      (progn
+        ;; (push nil *path-list*)
+        (send *obs* :set-color :red)))
+    (send *irtviewer* :draw-objects)
+    )
+
+(dotimes (i (length *path-list*))
+  (when (elt *path-list* i)
+    (send (elt *obs-list* i) :set-color :yellow)
+    (play-path (elt *path-list* i))
+    (send (elt *obs-list* i) :set-color :green)))
+
+
+(dotimes (i (length *path-list*))
+  (unless (elt *path-list* i)
+    (setq *obs* (elt *obs-list* i))
+    (bench (init-graph))
+    (send *graph* :start-state (send *graph* :node "r-0-s-fk"))
+    (solve-graph)
+    (if *path*
+        (progn
+          (setf (elt *path-list* i) *path*)
+          (send (elt *obs-list* i) :set-color :green))
+      (send (elt *obs-list* i) :set-color :red))))
+
+
+;;-------------------------------------------------------------------------------------------;;

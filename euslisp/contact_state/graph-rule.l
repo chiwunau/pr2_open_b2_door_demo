@@ -54,7 +54,9 @@
       (send *pr2* :move-to (send n :get-value :base-coords) :world)))
   (pqp-collision-check-objects 
    (list (send *pr2* :base_footprint_lk))
-   (list *obs*))
+   (if (listp *obs*)
+       *obs*
+     (list *obs*)))
   )
   
   

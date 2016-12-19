@@ -17,7 +17,9 @@
 
 ;;----------------copy from irtmodel.l---------------------------;;
  (:calc-torque-from-ext-wrenches-with-base
-   (&key (force-list) (moment-list) (target-coords) (link-list (mapcar #'(lambda (tc) (send self :link-list (send tc :parent))) target-coords)) ((:jacobi tmp-jacobi)))
+   (&key (force-list) (moment-list) (target-coords) (link-list nil) ((:jacobi tmp-jacobi)))
+   (unless link-list
+     (setq link-list (mapcar #'(lambda (tc) (send self :link-list (send tc :parent))) target-coords)))
    (let* (
           (jacobi
            (if tmp-jacobi
@@ -41,19 +43,20 @@
        (setf (elt ret-tq (position (send (elt ul i) :joint) joint-list)) (elt tq i)))
      ret-tq))
 
-   (:calc-joint-angle-speed-gain
-   (union-link-list dav periodic-time)
-   ;; (setq *ullj* (send-all union-link-list :joint))
-   ;; (setq *ull* union-link-list)
-   (let* ((fik-len (send self :calc-target-joint-dimension union-link-list))
-	  (av (instantiate float-vector fik-len)) j)
-     (do* ((i 0 (+ i (send j :joint-dof)))
-	   (l 0 (1+ l)))
-	 ((>= l (length union-link-list)))
-       (setq j (send (elt union-link-list l) :joint))
-       (dotimes (k (send j :joint-dof))
-	 (setf (elt av (+ i k)) (send j :calc-angle-speed-gain dav i periodic-time))))
-     av)))
+   ;; (:calc-joint-angle-speed-gain
+   ;; (union-link-list dav periodic-time)
+   ;; ;; (setq *ullj* (send-all union-link-list :joint))
+   ;; ;; (setq *ull* union-link-list)
+   ;; (let* ((fik-len (send self :calc-target-joint-dimension union-link-list))
+   ;;        (av (instantiate float-vector fik-len)) j)
+   ;;   (do* ((i 0 (+ i (send j :joint-dof)))
+   ;;         (l 0 (1+ l)))
+   ;;       ((>= l (length union-link-list)))
+   ;;     (setq j (send (elt union-link-list l) :joint))
+   ;;     (dotimes (k (send j :joint-dof))
+   ;;       (setf (elt av (+ i k)) (send j :calc-angle-speed-gain dav i periodic-time))))
+   ;;   av))
+)
 
 
    

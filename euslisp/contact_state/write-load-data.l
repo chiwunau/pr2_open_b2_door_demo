@@ -22,8 +22,3 @@
     (send n :put-value :ik-target-coords nil))
 
   (dump-loadable-structure path *all-nodes* *bridge-nodes*))
-  
-
-
-            
-           

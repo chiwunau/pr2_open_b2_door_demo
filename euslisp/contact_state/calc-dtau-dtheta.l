@@ -106,24 +106,24 @@
    ;; (print z)
    z))
 
-(defun calc-torque-gradient (force moment wrenches-cds &key link-list move-target (rotation-axis t) (translation-axis t) (use-base nil) ((:jacobi tmp-jacobi)) (robot *pr2*))
+(defun calc-torque-gradient (force moment wrenches-cds &key link-list move-target (rotation-axis t) (translation-axis t) (use-base nil) (jacobi nil) (robot *pr2*))
   (let* ((fik-len (send robot :calc-target-joint-dimension link-list))
 ;;        (dim (send *pr2* :calc-target-axis-dimension rotation-axis translation-axis))
-        (fik (setq fik (make-matrix fik-len fik-len)))
-        ;; (f-proj (send move-target :inverse-transform-vector (send wrenches-cds :transform-vector force)))
-        ;; (m-proj (send move-target :inverse-transform-vector (send wrenches-cds :transform-vector moment)))
-        (f-proj (send (send robot :copy-worldcoords);; (send (car link-list) :parent)
-                      :inverse-rotate-vector force))
-        (m-proj (send (send robot :copy-worldcoords);; (send (car link-list) :parent)
-                      :inverse-rotate-vector moment))
-        (tmp-jacobi (if tmp-jacobi tmp-jacobi (send robot :calc-jacobian-from-link-list link-list :move-target move-target :transform-coords (send robot :copy-worldcoords);; (send (car link-list) :parent)
+         (fik (make-matrix fik-len fik-len))
+         ;; (f-proj (send move-target :inverse-transform-vector (send wrenches-cds :transform-vector force)))
+         ;; (m-proj (send move-target :inverse-transform-vector (send wrenches-cds :transform-vector moment)))
+         (f-proj (send (send robot :copy-worldcoords);; (send (car link-list) :parent)
+                       :inverse-rotate-vector force))
+         (m-proj (send (send robot :copy-worldcoords);; (send (car link-list) :parent)
+                       :inverse-rotate-vector moment))
+         (jacobi (if jacobi jacobi (send robot :calc-jacobian-from-link-list link-list :move-target move-target :transform-coords (send robot :copy-worldcoords);; (send (car link-list) :parent)
                                                     :rotation-axis t :translation-axis t)))
         )
     ;; (setq *jacobi* tmp-jacobi)
     ;; (setq *jl* (send-all link-list :joint))
     (dolist (j (send-all link-list :joint))
       (dotimes (dof-count (send j :joint-dof))
-        (let ((diff-jacobi-joint (calc-jacobian-joint-gradient j dof-count :move-target move-target :link-list link-list :jacobi tmp-jacobi :robot robot))
+        (let ((diff-jacobi-joint (calc-jacobian-joint-gradient j dof-count :move-target move-target :link-list link-list :jacobi jacobi :robot robot))
               (l (position j (send-all link-list :joint) :test #'equal)))
 
           (dotimes (r fik-len)
@@ -139,16 +139,17 @@
       )
       fik))
 
-(defun calc-jacobian-joint-gradient (j dof-count &key move-target link-list ((:jacobi tmp-jacobi)) (robot *pr2*))
+(defun calc-jacobian-joint-gradient (j dof-count &key move-target link-list (jacobi nil) (robot *pr2*))
   (let* ((ang (send j :joint-angle))
          (dq  0.1)
          (dq-om 0.1) ;;for omniwheel-joint (dof > 1)
          dqv ;;for omniwheel-joint (dof > 1)
          jacobi-q jacobi-q+dq
+         base-jacobi-trans-coords
          diff-jacobi)
 
     (setq base-jacobi-trans-coords (send robot :copy-worldcoords))
-    (setq jacobi-q (if tmp-jacobi tmp-jacobi
+    (setq jacobi-q (if jacobi jacobi
             (send robot :calc-jacobian-from-link-list link-list :move-target move-target :transform-coords base-jacobi-trans-coords;; (send (car link-list) :parent)
                   :rotation-axis t :translation-axis t)))
 
