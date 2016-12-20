@@ -13,7 +13,9 @@
 
 ;;   ;;add nodes to graph
   (dolist (n nodes)
-    (when (and (not (colide-obstacle? n))
+    (send n :put :obstacle-dist-cost (obstacle-dist-cost :node n :obstacle *obs*))
+    ;; (print (send n :get :obstacle-dist-cost))
+    (when (and ;;(not (colide-obstacle? n))
                (not (send n :get-value :overload?)))
       (send graph :add-node n)))
             
@@ -21,14 +23,8 @@
   (dotimes (depth (- *graph-depth* 1))
     (let ((ns1 (extract-nodes-by-depth depth :nodes nodes))
           (ns2 (extract-nodes-by-depth (+ depth 1) :nodes nodes)))
-      (setq *ns1* ns1)
-      ;; (print ns1)
-      ;; (print ns2)
-      ;; (print "--------")
       (dolist (n1 ns1)
-;;        (print n1)
         (when (member n1 (send graph :nodes))
-;          (print n1)
           (if (eq (send n1 :get-value :graph-depth) 0) ;;add start node
                (send graph :add-arc start-node n1 1 :both nil))
           (dolist (n2 ns2)
@@ -40,20 +36,22 @@
                ((or (eq (send n1 :get-value :contact-type) 'grasp) (eq (send n2 :get-value :contact-type) 'grasp)) ;;when either node is grasp knob
                 (if (and (equal (send n1 :get-value :object-coords-index) (send n2 :get-value :object-coords-index)) (equal (send n1 :get-value :arm) (send n2 :get-value :arm)))
                     (send graph :add-arc n1 n2
-                          (calc-distance-between-pose 
-                           (if (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :robot-pose))
-                           (if (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :robot-pose))
-                           (if (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :base-coords-optimized) (send n1 :get-value :base-coords))
-                           (if (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :base-coords-optimized) (send n2 :get-value :base-coords)))
+                          (+ (pose-diff-cost 
+                              (if (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :robot-pose))
+                              (if (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :robot-pose))
+                              (if (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :base-coords-optimized) (send n1 :get-value :base-coords))
+                              (if (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :base-coords-optimized) (send n2 :get-value :base-coords)))
+                             (send n2 :get :obstacle-dist-cost))
                           :both nil)))
                ((and (equal (send n1 :get-value :arm) (send n2 :get-value :arm)) (equal (send n1 :get-value :contact-point) (send n2 :get-value :contact-point)))
                 (if (transitable? n1 n2)
                     (send graph :add-arc n1 n2
-                          (calc-distance-between-pose 
-                           (if (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :robot-pose))
-                           (if (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :robot-pose))
-                           (if (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :base-coords-optimized) (send n1 :get-value :base-coords))
-                           (if (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :base-coords-optimized) (send n2 :get-value :base-coords)))
+                          (+ (pose-diff-cost
+                              (if (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :robot-pose))
+                              (if (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :robot-pose))
+                              (if (send n1 :get-value :robot-pose-optimized) (send n1 :get-value :base-coords-optimized) (send n1 :get-value :base-coords))
+                              (if (send n2 :get-value :robot-pose-optimized) (send n2 :get-value :base-coords-optimized) (send n2 :get-value :base-coords)))
+                             (send n2 :get :obstacle-dist-cost))
                           :both nil))
                 )
               )))))))
@@ -65,14 +63,14 @@
       (when (and (member ri (send graph :nodes)) (member li (send graph :nodes)))
         (send graph :add-node n)
         (send graph :add-arc ri n
-              (calc-distance-between-pose
+              (pose-diff-cost
                (if (send ri :get-value :robot-pose-optimized) (send ri :get-value :robot-pose-optimized) (send ri :get-value :robot-pose))
                (send n :get-value :robot-pose)
                (if (send ri :get-value :robot-pose-optimized) (send ri :get-value :base-coords-optimized) (send ri :get-value :base-coords))
                (send n :get-value :base-coords))
               :both t)
         (send graph :add-arc li n 
-              (calc-distance-between-pose
+              (pose-diff-cost
                (if (send li :get-value :robot-pose-optimized) (send li :get-value :robot-pose-optimized) (send li :get-value :robot-pose))
                (send n :get-value :robot-pose)
                (if (send li :get-value :robot-pose-optimized) (send li :get-value :base-coords-optimized) (send li :get-value :base-coords))
@@ -91,13 +89,16 @@
   (set-start-goal-state)
   ))
 
-(defun solve-graph ()
-  (defmethod a*-graph-search-solver
-    (:hn (n p)
-       0.0))
-  (setq *solver* (instance a*-graph-search-solver :init *graph*))
-  ;; (setq *solver* (instance depth-first-graph-search-solver))
-  (setq *path* (send *solver* :solve *graph* :verbose nil))
+(defun solve-graph (g)
+  (let (solver path)
+    (defmethod a*-graph-search-solver
+      (:hn (n p)
+           0.0))
+    (setq solver (instance a*-graph-search-solver :init g))
+    ;; (setq *solver* (instance depth-first-graph-search-solver))
+    (setq path (send solver :solve g :verbose nil))
+    (setq *path* path)
+    path)
   )
 
 (defun extract-nodes-by-depth (depth &key (nodes *all-nodes*))
@@ -208,7 +209,7 @@
         (let (c) 
           (setq c (make-cube 100 100 200))
           (send c :translate (send *door* :worldpos))
-          (send c :translate #f(0 0 100))
+          (send c :translate #f(0 0 101)) ;;base z-axis of pr2 base-coords is zero
           (send c :translate (float-vector (- (+ door-width (/ v-step 2))) (/ h-step 2) 0))
           (send c :translate (float-vector (- (* p v-step)) (- (* 3 h-step) (* q h-step)) 0))
           (push c cube-list))))
@@ -218,7 +219,7 @@
         (let (c) 
           (setq c (make-cube 100 100 200))
           (send c :translate (send *door* :worldpos))
-          (send c :translate #f(0 0 100))
+          (send c :translate #f(0 0 101))
           (send c :translate (float-vector (- (+ door-width (/ v-step 2))) (/ h-step 2) 0))
           (send c :translate (float-vector (* (+ 1 p) v-step) (- (+ (* 5 h-step) (* q h-step))) 0))
           (push c cube-list))))
@@ -228,7 +229,7 @@
         (let (c) 
           (setq c (make-cube 100 100 200))
           (send c :translate (send *door* :worldpos))
-          (send c :translate #f(0 0 100))
+          (send c :translate #f(0 0 101))
           (send c :translate (float-vector (- (+ door-width (/ v-step 2))) (/ h-step 2) 0))
           (send c :translate (float-vector (* (+ 1 p) v-step) (- (+ (* -3 h-step) (* q h-step))) 0))
           (push c cube-list))))

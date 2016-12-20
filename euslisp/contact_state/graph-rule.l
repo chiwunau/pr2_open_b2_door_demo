@@ -1,5 +1,5 @@
 (setq *cof-p* 0.0)
-(defun calc-distance-between-pose
+(defun pose-diff-cost
   (p1 p2 b1 b2) ;;pose1(reccent) pose2(next) base1(reccent) base2(next)
   (let* ((cof-p *cof-p*)
          (cof-b (- 1 cof-p))
@@ -20,6 +20,33 @@
     ;; (format t "~A, ~A, " diff-p diff-b)
     ;; (format t "~A, ~A~%" (/ (norm (send diff-cds :pos)) 1000) (abs (car (car (send diff-cds :rpy-angle)))))
     (+ (* cof-p diff-p) (* cof-b diff-b))))
+
+(defun obstacle-dist-cost (&key node obstacle)
+  (unless obstacle
+    (return-from obstacle-dist-cost 0.0))
+  (if (send node :get-value :robot-pose-optimized)
+      (progn
+        (send *pr2* :angle-vector (send node :get-value :robot-pose-optimized))
+        (send *pr2* :move-to (send node :get-value :base-coords-optimized) :world))
+    (progn
+      (send *pr2* :angle-vector (send node :get-value :robot-pose))
+      (send *pr2* :move-to (send node :get-value :base-coords) :world)))
+  
+  (let ((d (car (pqp-collision-distance (send *pr2* :base_footprint_lk) obstacle)))
+        (d-thres 200.0) ;;20cm
+        cost)
+    (if (> d 0.0)
+        (cond
+         ((>= d d-thres)
+          (setq cost 0))
+         ((< d d-thres)
+          (setq cost (* (/ (- d-thres d) d-thres) 100.0))))
+      (let ((shortest-dist (* (car (find-if #'(lambda (x) x) (send-all (send obstacle :faces) :intersect-line (send *pr2* :pos) (send obstacle :centroid))))
+                              (distance (send *pr2* :pos) (send obstacle :centroid)))))
+        ;; (print shortest-dist)
+        (setq cost (* 100 (- (/ 480 shortest-dist) 1)))))
+    cost))
+        
 
 
 ;; (defun overload-node? (n &optional (door-weight 2.5))
@@ -58,6 +85,7 @@
        *obs*
      (list *obs*)))
   )
+
   
   
 
