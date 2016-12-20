@@ -44,7 +44,7 @@
             ((and (equal (send n :get-value :arm) :larm) (eq (send n :get-value :contact-point-index) 2))
              (push n lns2))
             (t
-             (print "WTF"))))
+             nil)))
     (setq ns-list (list (reverse rns0) (reverse rns1) (reverse rns2) (reverse lns0) (reverse lns1) (reverse lns2)))
     (do ((i 0 (+ i 1))) ((>= i (length ns-list)))
         (update-loaded-nodes :robot (elt robots i) :door (elt doors i) :nodes (elt ns-list i))
