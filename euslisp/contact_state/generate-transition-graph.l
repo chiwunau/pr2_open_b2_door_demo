@@ -197,6 +197,108 @@
           :send-action t)
     ))
 
+
+(defun execute-robot-motion-one-by-one (&optional (p *path*))
+  (let ((t-interval 3000.0) ;msec
+        (ns (send-all p :state))
+        avs
+        base-cds-list
+        traj-points
+        diff-v
+        diff-cds
+        sttm
+        pre-av
+        pre-base
+        av
+        base
+        traj-pt)
+
+    (dolist (n ns)    
+      (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
+        (if (send n :get-value :robot-pose-optimized)
+            (progn (push (send n :get-value :robot-pose-optimized) avs)
+                   (push (send n :get-value :base-coords-optimized) base-cds-list))
+          (progn (push (send n :get-value :robot-pose) avs)
+                 (push (send n :get-value :base-coords) base-cds-list)))))
+    
+    (send *pr2* :move-to (elt base-cds-list 0) :world)
+    (send *pr2* :angle-vector (elt avs 0))
+    (setq pre-base (send *pr2* :copy-worldcoords))
+    
+    
+    (dotimes (i (length ns)) ;;init avs and base-cds-list
+      (let ((n (elt ns i))
+            (next-n (if (< i (- (length ns) 1)) (elt ns (+ i 1))))
+            (pre-n (if (> i 0) (elt ns (- i 1)))))
+        (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
+          (if (send n :get-value :robot-pose-optimized)
+              (progn (play-node n :optimized t)
+                     (setq av (send n :get-value :robot-pose-optimized))
+                     (setq base (send n :get-value :base-coords-optimized)))
+            (progn (play-node n :optimized nil)
+                   (setq av (send n :get-value :robot-pose))
+                   (setq base (send n :get-value :base-coords))))
+
+          (setq diff-cds (send pre-base :transformation base))
+          (setq diff-v (send diff-cds :pos))
+          (setq traj-pt (float-vector (elt diff-v 0)
+                                      (elt diff-v 1)
+                                      (vector-angle #f(1 0 0) (matrix-column (send diff-cds :worldrot) 0) #f(0 0 1))))
+          
+          (setq sttm (ros::time+ (ros::time-now) (ros::time 1)))
+          (send *ri* :angle-vector av
+                t-interval
+                :default-controller sttm)
+          (send *ri* :move-trajectory-sequence
+                (list traj-pt)
+                (list t-interval)
+                :start-time sttm
+                :send-action nil)
+          
+          (when (send n :get-value :islands) ;;if n is dual contact
+            (let ((rn (get-node (car (send n :get-value :islands))))
+                  (ln (get-node (cadr (send n :get-value :islands)))))
+              
+              (if (eq (send rn :get-value :contact-type) 'grasp)
+                  (progn
+                    (send *ri* :wait-interpolation)
+                    (send *ri* :start-grasp :rarm)
+                    ))
+              
+              (if (eq (send ln :get-value :contact-type) 'grasp) 
+                  (progn
+                    (send *ri* :wait-interpolation)
+                    (send *ri* :start-grasp :larm)
+                    ))
+              
+              (cond ((and (not (eq (send pre-n :get-value :contact-type) 'grasp)) (or (eq (send rn :get-value :contact-type) 'grasp) (eq (send rn :get-value :contact-type) 'grasp))) ;;pre not grasp -> either grasp
+                     (unix:usleep (* 1000 1000)))
+                    ((and (eq (send rn :get-value :contact-type) 'grasp) (eq (send ln :get-value :contact-type) 'grasp)) ;;pre grasp -> both grasp
+                     (unix:usleep (* 1000 1000))))
+              
+              (cond ((and (or (eq (send rn :get-value :contact-type) 'grasp) (eq (send ln :get-value :contact-type) 'grasp)) (not (eq (send next-n :get-value :contact-type) 'grasp)));;either grasp -> next no grasp
+                     (send *ri* :stop-grasp :rarm)
+                     (send *ri* :stop-grasp :larm)
+                     (unix:usleep (* 1000 1000)))
+                    
+                    ((and (eq (send rn :get-value :contact-type) 'grasp) (eq (send ln :get-value :contact-type) 'grasp) (eq (send next-n :get-value :contact-type) 'grasp));;both grasp -> next single grasp
+                     (if (eq (send next-n :get-value :arm) :rarm)
+                         (send *ri* :stop-grasp :larm)
+                       (send *ri* :stop-grasp :rarm))
+                     (unix:usleep (* 1000 1000))))
+              ))
+          
+          (send *ri* :wait-interpolation)
+          (do-until-key 
+           (print "press key")
+           (unix::usleep (* 1000 1000)))
+
+        (send *pr2* :move-to base :world)
+        (setq pre-base (send *pr2* :copy-worldcoords))
+        )
+        ))))
+        
+
 (defun init-obstacle ()
   (let* ((door-width (elt (send (car (send (elt (send *door* :links) 1) :bodies)) :body-type) 2))
          (h-step (/ door-width 4))

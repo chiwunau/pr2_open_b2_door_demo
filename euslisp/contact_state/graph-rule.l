@@ -103,6 +103,39 @@
 ;;    (not (pqp-collision-check-objects (append (send *pr2* :torso :parent-link) (send *pr2* (send n1 :get-value :arm) :links))  (send *door* :links)))
 ;;     ))
 
+(defun play-middle-state (n1 n2)
+  (let* ((pose-pli (pos-list-interpolation (list (if (send n1 :get-value :robot-pose-optimized)
+                                                     (send n1 :get-value :robot-pose-optimized)
+                                                   (send n1 :get-value :robot-pose))
+                                                 (if (send n2 :get-value :robot-pose-optimized)
+                                                     (send n2 :get-value :robot-pose-optimized)
+                                                   (send n2 :get-value :robot-pose)))
+                                           (list 500) 250))
+         (diff-cds (send (send (if (send n1 :get-value :robot-pose-optimized)
+                                   (send n1 :get-value :base-coords-optimized)
+                                 (send n1 :get-value :base-coords))
+                               :transformation (if (send n2 :get-value :robot-pose-optimized)
+                                                   (send n2 :get-value :base-coords-optimized)
+                                                 (send n2 :get-value :base-coords)))
+                         :copy-worldcoords))
+         (base-pos-rot-v (coerce (append (coerce (send diff-cds :pos) cons) (list (caar (send diff-cds :rpy-angle)))) float-vector))
+         (base-pli (pos-list-interpolation (list (coerce (make-list (length base-pos-rot-v) :initial-element 0) float-vector) base-pos-rot-v) (list 500) 250))
+         (mid-cds (send (send (send (if (send n1 :get-value :robot-pose-optimized)
+                                        (send n1 :get-value :base-coords-optimized)
+                                      (send n1 :get-value :base-coords)) :copy-worldcoords)
+                              :translate (subseq (elt (cadr base-pli) 1) 0 3))
+                        :rotate (elt (elt (cadr base-pli) 1) 3) :z))
+         )
+    
+    (setq *pose-pli* pose-pli)
+    (setq *mid-cds* mid-cds)
+    (send *pr2* :angle-vector (elt (cadr pose-pli) 1))
+    (send *pr2* :move-to mid-cds :world)
+    )
+  )
+
+
+
 (defun transitable? (n1 n2)
 (return-from transitable? t) ;;for-debug
   (let* ((pose-pli (pos-list-interpolation (list (send n1 :get-value :pose) (send n2 :get-value :pose)) (list 750) 250))
@@ -158,3 +191,37 @@
         (if p
             (elt *bridge-nodes* p))))))
 
+
+(defun refine-path-continuous-joint-ang (&optional (p *path*))
+  (let ((ns (send-all p :state)))
+    (dolist (n ns)
+      (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
+        (if (send n :get-value :robot-pose-optimized)
+            (progn 
+              (send *pr2* :angle-vector (send n :get-value :robot-pose-optimized))
+              (send *pr2* :larm :elbow-r :joint-angle (refine-continuous-joint-ang (send *pr2* :larm :elbow-r :joint-angle) 360))
+              (send *pr2* :larm :wrist-r :joint-angle (refine-continuous-joint-ang (send *pr2* :larm :wrist-r :joint-angle) 180))
+              (send *pr2* :rarm :elbow-r :joint-angle (refine-continuous-joint-ang (send *pr2* :rarm :elbow-r :joint-angle) 360))
+              (send *pr2* :rarm :wrist-r :joint-angle (refine-continuous-joint-ang (send *pr2* :rarm :wrist-r :joint-angle) 180))
+              (send n :put-value :robot-pose-optimized (send *pr2* :angle-vector))))
+        
+        (send *pr2* :angle-vector (send n :get-value :robot-pose))
+        (send *pr2* :larm :elbow-r :joint-angle (refine-continuous-joint-ang (send *pr2* :larm :elbow-r :joint-angle) 360))
+        (send *pr2* :larm :wrist-r :joint-angle (refine-continuous-joint-ang (send *pr2* :larm :wrist-r :joint-angle) 180))
+        (send *pr2* :rarm :elbow-r :joint-angle (refine-continuous-joint-ang (send *pr2* :rarm :elbow-r :joint-angle) 360))
+        (send *pr2* :rarm :wrist-r :joint-angle (refine-continuous-joint-ang (send *pr2* :rarm :wrist-r :joint-angle) 180))
+        (send n :put-value :robot-pose (send *pr2* :angle-vector))))))
+
+
+(defun refine-continuous-joint-ang (ang repeat-ang)
+  (cond ((> (mod ang repeat-ang) (/ repeat-ang 2))
+         (setq ang (- (mod ang repeat-ang) repeat-ang)))
+        ((>= (mod ang repeat-ang) 0.0)
+         (setq ang (mod ang repeat-ang)))
+
+        ((< (mod ang repeat-ang) (/ repeat-ang -2))
+         (setq ang (+ (mod ang repeat-ang) repeat-ang)))
+        ((<= (mod ang repeat-ang) 0.0)
+         (setq ang (mod ang repeat-ang))))
+  ang)
+  
