@@ -127,10 +127,13 @@
                         :rotate (elt (elt (cadr base-pli) 1) 3) :z))
          )
     
-    (setq *pose-pli* pose-pli)
-    (setq *mid-cds* mid-cds)
+    ;; (setq *pose-pli* pose-pli)
+    ;; (setq *mid-cds* mid-cds)
+    (send *door* :hinge :joint-angle (/ (+ (send n1 :get-value :door-angle) (send n2 :get-value :door-angle)) 2.0))
     (send *pr2* :angle-vector (elt (cadr pose-pli) 1))
     (send *pr2* :move-to mid-cds :world)
+    (send *irtviewer* :draw-objects)
+
     )
   )
 
@@ -225,3 +228,68 @@
          (setq ang (mod ang repeat-ang))))
   ang)
   
+
+(defun same-end-coords-force-elbow-wrist-counter-rotate (pre-n n)
+  (cond ((and (send pre-n :get-value :islands) (eq (send n :get-value :contact-type) 'grasp))
+         (let (ep1 ep2
+                   elbow-r1 elbow-r2
+                   wrist-r1 wrist-r2)
+           (play-node-best pre-n :draw-objects nil)
+           (setq ep1 (send *pr2* (send n :get-value :arm) :end-coords :worldpos))
+           (setq elbow-r1 (send *pr2* (send n :get-value :arm) :elbow-r :joint-angle))
+           (setq wrist-r1 (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle))
+           (play-node-best n :draw-objects nil)
+           (setq ep2 (send *pr2* (send n :get-value :arm) :end-coords :worldpos))
+           (setq elbow-r2 (send *pr2* (send n :get-value :arm) :elbow-r :joint-angle))
+           (setq wrist-r2 (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle))
+           
+           (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
+                                                  (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
+               (if (> (abs (- wrist-r2 wrist-r1)) 90)
+                   (if (< wrist-r2 0)
+                       (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle (+ wrist-r2 180))
+                     (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle (- wrist-r2 180))))))
+         )
+
+        ((and (send n :get-value :islands) (eq (send pre-n :get-value :contact-type) 'grasp))
+         (let (ep1 ep2
+                   elbow-r1 elbow-r2
+                   wrist-r1 wrist-r2)
+           (play-node-best pre-n :draw-objects nil)
+           (setq ep1 (send *pr2* (send pre-n :get-value :arm) :end-coords :worldpos))
+           (setq elbow-r1 (send *pr2* (send pre-n :get-value :arm) :elbow-r :joint-angle))
+           (setq wrist-r1 (send *pr2* (send pre-n :get-value :arm) :wrist-r :joint-angle))
+           (play-node-best n :draw-objects nil)
+           (setq ep2 (send *pr2* (send pre-n :get-value :arm) :end-coords :worldpos))
+           (setq elbow-r2 (send *pr2* (send pre-n :get-value :arm) :elbow-r :joint-angle))
+           (setq wrist-r2 (send *pr2* (send pre-n :get-value :arm) :wrist-r :joint-angle))
+
+           (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
+                                                  (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
+               (if (> (abs (- wrist-r2 wrist-r1)) 90)
+                   (if (< wrist-r2 0)
+                       (send *pr2* (send pre-n :get-value :arm) :wrist-r :joint-angle (+ wrist-r2 180))
+                     (send *pr2* (send pre-n :get-value :arm) :wrist-r :joint-angle (- wrist-r2 180))))))
+         )
+
+        ((and (eq (send n :get-value :contact-type) 'grasp) (eq (send pre-n :get-value :contact-type) 'grasp))
+         (let (ep1 ep2
+                   elbow-r1 elbow-r2
+                   wrist-r1 wrist-r2)
+           (play-node-best pre-n :draw-objects nil)
+           (setq ep1 (send *pr2* (send pre-n :get-value :arm) :end-coords :worldpos))
+           (setq elbow-r1 (send *pr2* (send pre-n :get-value :arm) :elbow-r :joint-angle))
+           (setq wrist-r1 (send *pr2* (send pre-n :get-value :arm) :wrist-r :joint-angle))
+           (play-node-best n :draw-objects nil)
+           (setq ep2 (send *pr2* (send n :get-value :arm) :end-coords :worldpos))
+           (setq elbow-r2 (send *pr2* (send n :get-value :arm) :elbow-r :joint-angle))
+           (setq wrist-r2 (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle))
+           
+           (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
+                                                  (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
+               (if (> (abs (- wrist-r2 wrist-r1)) 90)
+                   (if (< wrist-r2 0)
+                       (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle (+ wrist-r2 180))
+                     (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle (- wrist-r2 180)))))))
+        )
+)

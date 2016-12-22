@@ -221,39 +221,45 @@
           (progn (push (send n :get-value :robot-pose) avs)
                  (push (send n :get-value :base-coords) base-cds-list)))))
     
+    (setq avs (reverse avs))
+    (setq base-cds-list (reverse base-cds-list))
     (send *pr2* :move-to (elt base-cds-list 0) :world)
     (send *pr2* :angle-vector (elt avs 0))
     (setq pre-base (send *pr2* :copy-worldcoords))
-    
-    
-    (dotimes (i (length ns)) ;;init avs and base-cds-list
-      (let ((n (elt ns i))
-            (next-n (if (< i (- (length ns) 1)) (elt ns (+ i 1))))
-            (pre-n (if (> i 0) (elt ns (- i 1)))))
-        (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
-          (if (send n :get-value :robot-pose-optimized)
-              (progn (play-node n :optimized t)
-                     (setq av (send n :get-value :robot-pose-optimized))
-                     (setq base (send n :get-value :base-coords-optimized)))
-            (progn (play-node n :optimized nil)
-                   (setq av (send n :get-value :robot-pose))
-                   (setq base (send n :get-value :base-coords))))
 
+    (send *ri* :stop-grasp)
+    
+    
+    ;; (dotimes (i (length ns)) ;;init avs and base-cds-list
+    (do ((i 0 (+ i 1))) ((>= i (length ns)))
+        (let ((n (elt ns i))
+              (next-n (if (< i (- (length ns) 1)) (elt ns (+ i 1))))
+            (pre-n (if (> i 0) (elt ns (- i 1)))))
+          (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
+          (play-node-best n)
+          (same-end-coords-force-elbow-wrist-counter-rotate pre-n n) ;;-> change wrist angle
+
+          (setq av (send *pr2* :angle-vector))
+          (setq base (send *pr2* :copy-worldcoords))              
           (setq diff-cds (send pre-base :transformation base))
           (setq diff-v (send diff-cds :pos))
           (setq traj-pt (float-vector (elt diff-v 0)
                                       (elt diff-v 1)
                                       (vector-angle #f(1 0 0) (matrix-column (send diff-cds :worldrot) 0) #f(0 0 1))))
+          (print diff-v)
           
+
           (setq sttm (ros::time+ (ros::time-now) (ros::time 1)))
+          (let* ((diff-torso-angle (abs (- (elt (send *ri* :state :potentio-vector) 0) (elt av 0))))
+                 (min-t (* 1000 (/ diff-torso-angle 10))))
           (send *ri* :angle-vector av
-                t-interval
+                (if (> min-t t-interval) min-t t-interval)
                 :default-controller sttm)
           (send *ri* :move-trajectory-sequence
                 (list traj-pt)
-                (list t-interval)
+                (list (if (> min-t t-interval) min-t t-interval))
                 :start-time sttm
-                :send-action nil)
+                :send-action t))
           
           (when (send n :get-value :islands) ;;if n is dual contact
             (let ((rn (get-node (car (send n :get-value :islands))))
@@ -286,6 +292,44 @@
                          (send *ri* :stop-grasp :larm)
                        (send *ri* :stop-grasp :rarm))
                      (unix:usleep (* 1000 1000))))
+              
+
+              (let ((spare-arm (if (eq (send next-n :get-value :arm) :rarm) :larm :rarm))
+                    (spare-arm-av) res)
+                (send *co* :clear-all)
+                (dolist (obj (remove-if #'(lambda (x) (substringp "knob" (string (send x :name)))) (send *door* :links)))
+                  (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))
+                (play-node-best next-n :draw-objects nil)
+                (setq spare-arm-av (send *pr2* spare-arm :angle-vector))
+                (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+                (unless res
+                  (send *pr2* spare-arm :angle-vector (get-tuckarm (if (eq spare-arm :rarm) :larm :rarm) :outside spare-arm))
+                  (send *pr2* spare-arm :shoulder-r :joint-angle (if (eq spare-arm :rarm) -100 100))
+                  (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+                  (unless res
+                    (play-middle-state n next-n)
+                    (send *co* :clear-all)
+                    (dolist (obj (remove-if #'(lambda (x) (substringp "knob" (string (send x :name)))) (send *door* :links)))
+                      (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))
+                    (play-node-best next-n :draw-objects nil)
+                    (setq spare-arm-av (send *pr2* spare-arm :angle-vector))
+                    (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+                    (unless res
+                      (send *pr2* spare-arm :angle-vector (get-tuckarm (if (eq spare-arm :rarm) :larm :rarm) :outside spare-arm))
+                      (send *pr2* spare-arm :shoulder-r :joint-angle (if (eq spare-arm :rarm) -100 100))
+                      (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+                      (unless res
+                        (play-node-best next-n :draw-objects nil)
+                        (send *co* :clear-all)
+                        (dolist (obj (remove-if #'(lambda (x) (substringp "knob" (string (send x :name)))) (send *door* :links)))
+                          (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))
+                        (setq spare-arm-av (send *pr2* spare-arm :angle-vector))
+                        (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+                        (unless res
+                          (send *pr2* spare-arm :angle-vector (get-tuckarm (if (eq spare-arm :rarm) :larm :rarm) :outside spare-arm))
+                          (send *pr2* spare-arm :shoulder-r :joint-angle (if (eq spare-arm :rarm) -100 100))
+                          (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil)))))))
+                )
               ))
           
           (send *ri* :wait-interpolation)

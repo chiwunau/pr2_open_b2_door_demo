@@ -251,12 +251,109 @@
   (setq *bridge-nodes* (reverse *bridge-nodes*))
   )
 
+;; (defun init-bridge-nodes-parallel (&key rarm-nodes larm-nodes (robot *pr2*) (door *door*) depth) ;;multiple contact
+;;   ;; (let (res-nodes right-candidate-nodes left-candidate-nodes res)
+  
+;;   ;;   (dolist (n nodes)
+;;   ;;     (if (and (eq (send n :get-value :graph-depth) depth) (send n :get-value :solved) (send n :get-value :robot-pose))
+;;   ;;         (if (eq (send n :get-value :arm) :rarm)
+;;   ;;             (push n right-candidate-nodes)
+;;   ;;           (push n left-candidate-nodes))))
+;;   (let (res-nodes res)
+;;     (send door :hinge :joint-angle (* depth  (* -1 *door-rot-step*)))
+;;     (dolist (rn rarm-nodes)
+;;       (if (send rn :get-value :robot-pose-optimized)
+;;           (progn (send robot :angle-vector (send rn :get-value :robot-pose-optimized))
+;;                  (send robot :move-to (send rn :get-value :base-coords-optimized) :world))
+;;         (progn (send robot :angle-vector (send rn :get-value :robot-pose))
+;;                (send robot :move-to (send rn :get-value :base-coords) :world)))
+;;       (dolist (ln larm-nodes)
+;;         (when (not (eq (send rn :get-value :object-coords-index) (send ln :get-value :object-coords-index)))
+;;           (setq res (send robot :inverse-kinematics (list (send robot :rarm :end-coords :copy-worldcoords) (send robot :larm :end-coords :copy-worldcoords));(list (send rn :get-value :ik-target-coords) (send ln :get-value :ik-target-coords))
+;;                           :move-target (list (send robot :rarm :end-coords) (send robot :larm :end-coords));;(list (send rn :get-value :contact-point) (send ln :get-value :contact-point))
+;;                           :link-list (list (send robot :link-list (send robot :rarm :end-coords :parent)) (send robot :link-list (send robot :larm :end-coords :parent)));(list (send robot :link-list (send (send rn :get-value :contact-point) :parent)) (send robot :link-list (send (send ln :get-value :contact-point) :parent)))
+;;                           :stop 50
+;;                           ;; :collision-avoidance-link-pair (append (door-arm-base-collision-link-pair (send rn :get-value :contact-point) :use-base t :include-knob (if (eq (send rn :get-value :contact-type) 'grasp) nil t) :robot robot :door door)
+;;                           ;;                                        (door-arm-base-collision-link-pair (send ln :get-value :contact-point) :use-base t :include-knob (if (eq (send ln :get-value :contact-type) 'grasp) nil t) :robot robot :door door))
+;;                           ;; :avoid-collision-distance 50
+;;                           ;; :avoid-collision-joint-gain 5.0
+;;                           ;; :avoid-collision-null-gain 100.0
+;;                           :rotation-axis (list (case (send rn :get-value :contact-type)
+;;                                                      ('point nil)
+;;                                                      ('line :z)
+;;                                                      ('grasp t)
+;;                                                      (t t))
+;;                                                (case (send ln :get-value :contact-type)
+;;                                                      ('point nil)
+;;                                                      ('line :z)
+;;                                                      ('grasp t)
+;;                                                      (t t)))
+;;                         ;;                      (if (eq (send n :get-value :contact-point-index) 1) :z nil) ;;:z(line contact) for forearm
+;;                           :use-torso t
+;;                           :use-base 0.0001 ;;debugged in pr2-util.l
+;;                           :base-range (list :min (float-vector -600 -600 -80)
+;;                                           :max (float-vector 600 600  80))
+;;                           :warnp nil
+;;                           :debug-view debugview-bridge
+;;                           ))
+;;           ;; (print "-------------------")
+;;           ;; (print res)
+;;           ;; (when (and res
+;;           ;;            (or
+;;           ;;             (pqp-collision-check-objects ;rarm larm
+;;           ;;              (cdr (send robot :link-list (send (send robot :rarm :end-coords) :parent)))
+;;           ;;              (cdr (send robot :link-list (send (send robot :larm :end-coords) :parent))))
+;;           ;;             (pqp-collision-check-objects ;base+rarm door
+;;           ;;              (append (list (send robot :base_footprint_lk)) (send robot :link-list (send (send rn :get-value :contact-point) :parent)))
+;;           ;;              (case (send rn :get-value :object-coords-index)
+;;           ;;                    ('fk (remove-if #'(lambda (x) (substringp "front-knob" (string (send x :name)))) (send door :links)))
+;;           ;;                    ('rk (remove-if #'(lambda (x) (substringp "rear-knob" (string (send x :name)))) (send door :links)))
+;;           ;;                    (t (send door :links))))
+;;           ;;             (pqp-collision-check-objects ;larm door
+;;           ;;              (send robot :link-list (send (send ln :get-value :contact-point) :parent))
+;;           ;;              (case (send ln :get-value :object-coords-index)
+;;           ;;                    ('fk (remove-if #'(lambda (x) (substringp "front-knob" (string (send x :name)))) (send door :links)))
+;;           ;;                    ('rk (remove-if #'(lambda (x) (substringp "rear-knob" (string (send x :name)))) (send door :links)))
+;;           ;;                    (t (send door :links))))
+;;           ;;             ))
+;;           ;;   (setq res nil))
+;;         ;;           (print res)
+;;         ;; (when res
+;;         ;;   (let ((n (instance extended-node :init (format nil "~A<->~A"
+;;         ;;                                                  (send rn :name) (send ln :name)))))
+            
+;;         ;;     (send n :put-value :arm :arms)
+;;         ;;     (send n :put-value :islands (list (send rn :name) (send ln :name)))
+;;         ;;     ;; (send n :put-value :contact-point-index robot-contact-pts-idx)
+;;         ;;     ;; (send n :put-value :contact-point (elt robot-contact-pts robot-contact-pts-idx))
+;;         ;;     ;; (send n :put-value :contact-type (case robot-contact-pts-idx (1 'line) (t 'point)))
+;;         ;;     (send n :put-value :graph-depth depth)
+;;         ;;     (send n :put-value :door-angle (* depth (* -1 *door-rot-step*)))
+;;         ;;     ;; ;                  (send n :put-value :pose-idx k)
+;;         ;;     (send n :put-value :solved t)
+;;         ;;     (send n :put-value :robot-pose (send robot :angle-vector))
+;;         ;;     (send n :put-value :robot-pose-optimized nil)
+;;         ;;     (send n :put-value :base-coords (send robot :copy-worldcoords))
+;;         ;;     (send n :put-value :base-coords-optimized nil)
+;;         ;;     ;; (send n :put-value :object-coords-index obj-cds-idx)
+;;         ;;     ;; (send n :put-value :object-coords (elt obj-cds-list obj-cds-idx))
+;;         ;;     ;; (send n :put-value :ik-target-coords (send (elt obj-cds-list obj-cds-idx) :assoc (make-cascoords :coords (send (send (send (elt obj-cds-list obj-cds-idx) :copy-worldcoords) :translate *ik-target-shift*) :rotate (if (eq robot-contact-pts-idx 0) 0 pi/2) :y))))
+;;         ;;     (send n :put-value :torque nil)
+;;         ;;     (send n :put-value :overload? nil)
+;;         ;;     (push n res-nodes)))
+;;         )))
+;;     res-nodes
+;;     )
+;;   )
+
+
+
 
         
           
         
                           
-(defun robot-pose-sampling (&key (robot *pr2*) (door *door*) (nodes *all-nodes*) (optimize-exist-pose nil))
+(defun robot-pose-sampling (&key (robot *pr2*) (door *door*) (nodes *all-nodes*) (obstacle nil) (optimize-exist-pose nil))
   (dolist (n nodes)
     
     (send robot :move-to (make-coords) :world)
@@ -418,6 +515,18 @@
   (if draw-objects
       (send *irtviewer* :draw-objects :flush t))
   t)
+
+(defun play-node-best (n &key (optimized nil) (draw-objects t))
+  (if (send n :get-value :robot-pose-optimized)
+      (progn
+        (send *pr2* :angle-vector (send n :get-value :robot-pose-optimized))
+        (send *pr2* :move-to (send n :get-value :base-coords-optimized) :world))
+    (progn
+      (send *pr2* :angle-vector (send n :get-value :robot-pose))
+      (send *pr2* :move-to (send n :get-value :base-coords) :world)))
+    (send *door* :hinge :joint-angle (send n :get-value :door-angle))
+    (if draw-objects
+        (send *irtviewer* :draw-objects :flush t))))
 
 (defun door-arm-base-collision-link-pair (contact-pt &key (use-base t) (include-knob t) (robot *pr2*) (door *door*))
   (let ((ls1 (send door :links))
