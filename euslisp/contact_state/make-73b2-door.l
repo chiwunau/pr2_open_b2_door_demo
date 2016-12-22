@@ -31,23 +31,24 @@
            (send l3 :assoc l4)
 
 	   
-	   (setq b (make-cube 50 door-width (* 2 knob-height)))
+	   (setq b (make-cube door-thickness door-width (* 2 knob-height)))
 	   ;; (send b :locate (float-vector 25 (/ (+ door-radius 95) -2.0) knob-height))
-	   (send b :locate (float-vector 0 (/ door-width -2.0) knob-height))
+	   (send b :locate (float-vector (/ door-thickness 2) (/ door-width -2.0) knob-height))
+           (send l3 :translate (float-vector (/ door-thickness 2) 0 0))
 	   (send b :set-color :yellow 0.8)
 	   (setq l2 (instance bodyset-link :init (make-cascoords) :bodies (list b) :name 'door-plate))
 	   (send l2 :assoc l3)
 	   (send l2 :translate (float-vector (/ door-thickness 2) (/ door-thickness -2) 0))
            
-           (setq b (make-cube 50 door-width (* 2 knob-height)))
-           (send b :locate (float-vector 0 (* 3 (/ door-width -2.0)) knob-height))
+           (setq b (make-cube door-thickness door-width (* 2 knob-height)))
+           (send b :locate (float-vector (/ door-thickness 2) (* 3 (/ door-width -2.0)) knob-height))
 	   (send b :set-color :grey 0.8)
 	   (setq l5 (instance bodyset-link :init (make-cascoords) :bodies (list b) :name 'wall))
 	   (send l5 :translate (float-vector (/ door-thickness 2) (/ door-thickness -2) 0))
 
 	   
-	   (setq b (make-cube 50 50 (* 2 knob-height)))
-	   (send b :locate (float-vector 0 0 knob-height))
+	   (setq b (make-cube 10 10 (* 2 knob-height)))
+	   (send b :locate (float-vector (/ door-thickness 2) 0 knob-height))
 	   (send b :set-color :grey)
 	   (setq l1 (instance bodyset-link :init (make-cascoords) :bodies (list b) :name 'door-hinge))
 	   (send l1 :assoc l2)
@@ -81,16 +82,18 @@
   (:make-front-touch-cds-list
    (door-width knob-height &optional (p 8) (q 8))
    (let (cds-list
-         cds
-         (y-step (/ (/ door-width 2) p))
-         (y-offset 20) ;;avoid too close to door edge
-         (z-step (/ (/ knob-height 2) q)))
+         cds)
+     ;; (y-step (/ (/ door-width 2) p))
+     ;; (z-step (/ (/ knob-height 2) q)))
+     (setq h-step (/ (/ door-width 1) p))
+     (setq h-offset 50) ;;avoid too close to door edge
+     (setq v-step  (/ (/ door-width 0.8) q))
+;;     (setq v-step (/ (/ knob-height 1) q))
      (dotimes (i p)  
        (dotimes (j q)
-         (setq cds (make-cascoords))
-         (send cds :translate (float-vector 0 (- door-width) (* 1.25 knob-height)))
-         (send cds :rotate pi :z)
-         (send cds :translate (float-vector 10 (- (* i y-step) y-offset) (- (* j z-step))))
+         (setq cds (make-cascoords :coords (send l2 :copy-worldcoords)))
+         (send cds :translate (float-vector -1 (- door-width) (* 1.4 knob-height)))
+         (send cds :translate (float-vector 0 (+ (* i h-step) h-offset) (- (* j v-step))))
          (send (elt (send self :links) 1) :assoc cds) ;;assoc to door-plane link
          (push cds cds-list)))
      (setq front-touch-cds-list cds-list)
@@ -109,8 +112,8 @@
 ;;     (setq v-step (/ (/ knob-height 1) q))
      (dotimes (i p)  
        (dotimes (j q)
-         (setq cds (make-cascoords))
-         (send cds :translate (float-vector (+ 10 door-thickness) (- door-width) (* 1.4 knob-height)))
+         (setq cds (make-cascoords :coords (send l2 :copy-worldcoords)))
+         (send cds :translate (float-vector (+ 1 door-thickness) (- door-width) (* 1.4 knob-height)))
          (send cds :translate (float-vector 0 (+ (* i h-step) h-offset) (- (* j v-step))))
          (send (elt (send self :links) 1) :assoc cds) ;;assoc to door-plane link
          (push cds cds-list)))
