@@ -103,14 +103,14 @@
 ;;    (not (pqp-collision-check-objects (append (send *pr2* :torso :parent-link) (send *pr2* (send n1 :get-value :arm) :links))  (send *door* :links)))
 ;;     ))
 
-(defun play-middle-state (n1 n2)
+(defun play-middle-state (n1 n2 a b)
   (let* ((pose-pli (pos-list-interpolation (list (if (send n1 :get-value :robot-pose-optimized)
                                                      (send n1 :get-value :robot-pose-optimized)
                                                    (send n1 :get-value :robot-pose))
                                                  (if (send n2 :get-value :robot-pose-optimized)
                                                      (send n2 :get-value :robot-pose-optimized)
                                                    (send n2 :get-value :robot-pose)))
-                                           (list 500) 250))
+                                           (list (* (- b 1) 250)) 250))
          (diff-cds (send (send (if (send n1 :get-value :robot-pose-optimized)
                                    (send n1 :get-value :base-coords-optimized)
                                  (send n1 :get-value :base-coords))
@@ -119,18 +119,18 @@
                                                  (send n2 :get-value :base-coords)))
                          :copy-worldcoords))
          (base-pos-rot-v (coerce (append (coerce (send diff-cds :pos) cons) (list (caar (send diff-cds :rpy-angle)))) float-vector))
-         (base-pli (pos-list-interpolation (list (coerce (make-list (length base-pos-rot-v) :initial-element 0) float-vector) base-pos-rot-v) (list 500) 250))
+         (base-pli (pos-list-interpolation (list (coerce (make-list (length base-pos-rot-v) :initial-element 0) float-vector) base-pos-rot-v) (list (* (- b 1) 250)) 250))
          (mid-cds (send (send (send (if (send n1 :get-value :robot-pose-optimized)
                                         (send n1 :get-value :base-coords-optimized)
                                       (send n1 :get-value :base-coords)) :copy-worldcoords)
-                              :translate (subseq (elt (cadr base-pli) 1) 0 3))
-                        :rotate (elt (elt (cadr base-pli) 1) 3) :z))
+                              :translate (subseq (elt (cadr base-pli) a) 0 3))
+                        :rotate (elt (elt (cadr base-pli) a) 3) :z))
          )
     
     ;; (setq *pose-pli* pose-pli)
     ;; (setq *mid-cds* mid-cds)
-    (send *door* :hinge :joint-angle (/ (+ (send n1 :get-value :door-angle) (send n2 :get-value :door-angle)) 2.0))
-    (send *pr2* :angle-vector (elt (cadr pose-pli) 1))
+    (send *door* :hinge :joint-angle (+ (send n1 :get-value :door-angle) (* a (/ (- (send n2 :get-value :door-angle) (send n1 :get-value :door-angle)) (- b 1)))))
+    (send *pr2* :angle-vector (elt (cadr pose-pli) a))
     (send *pr2* :move-to mid-cds :world)
     (send *irtviewer* :draw-objects)
 
@@ -195,6 +195,30 @@
             (elt *bridge-nodes* p))))))
 
 
+(defun refine-postures-in-path (&optional (p *path*))
+  (set-spare-arm-tuck-arm-pose p)
+  (refine-path-continuous-joint-ang p)
+  (prevent-wrist-rotate p))
+
+
+(defun set-spare-arm-tuck-arm-pose (&optional (p *path*))
+  (let ((ns (send-all p :state)))
+    (dolist (n ns)
+      (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
+        (unless (send n :get-value :islands)
+          (if (send n :get-value :robot-pose-optimized)
+            (let ((spare-arm (if (eq (send n :get-value :arm) :rarm) :larm :rarm)))
+              (send *pr2* :angle-vector (send n :get-value :robot-pose-optimized))
+              (send *pr2* spare-arm :angle-vector (get-tuckarm (if (eq spare-arm :rarm) :larm :rarm) :outside spare-arm))
+              (send *pr2* spare-arm :shoulder-r :joint-angle (if (eq spare-arm :rarm) -100 100))
+              (send n :put-value :robot-pose-optimized (send *pr2* :angle-vector))))
+          (let ((spare-arm (if (eq (send n :get-value :arm) :rarm) :larm :rarm)))
+            (send *pr2* :angle-vector (send n :get-value :robot-pose))
+            (send *pr2* spare-arm :angle-vector (get-tuckarm (if (eq spare-arm :rarm) :larm :rarm) :outside spare-arm))
+            (send *pr2* spare-arm :shoulder-r :joint-angle (if (eq spare-arm :rarm) -100 100))
+            (send n :put-value :robot-pose (send *pr2* :angle-vector))))))))
+            
+
 (defun refine-path-continuous-joint-ang (&optional (p *path*))
   (let ((ns (send-all p :state)))
     (dolist (n ns)
@@ -227,8 +251,25 @@
         ((<= (mod ang repeat-ang) 0.0)
          (setq ang (mod ang repeat-ang))))
   ang)
-  
 
+(defun prevent-wrist-rotate (&optional (p *path*))
+  (let ((ns (send-all p :state)))
+    (do ((i 0 (+ i 1))) ((>= i (length ns)))
+        (let ((n (elt ns i))
+              (next-n (if (< i (- (length ns) 1)) (elt ns (+ i 1))))
+              (pre-n (if (> i 0) (elt ns (- i 1)))))
+          (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
+            (play-node-best n :draw-objects nil)
+            (same-end-coords-force-elbow-wrist-counter-rotate pre-n n)
+            (if (send n :get-value :robot-pose-optimized)
+                (send n :put-value :robot-pose-optimized (send *pr2* :angle-vector))
+              (send n :put-value :robot-pose (send *pr2* :angle-vector))))))))
+
+          
+
+          
+
+          
 (defun same-end-coords-force-elbow-wrist-counter-rotate (pre-n n)
   (cond ((and (send pre-n :get-value :islands) (eq (send n :get-value :contact-type) 'grasp))
          (let (ep1 ep2
@@ -243,13 +284,13 @@
            (setq elbow-r2 (send *pr2* (send n :get-value :arm) :elbow-r :joint-angle))
            (setq wrist-r2 (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle))
            
-           (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
-                                                  (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
-               (if (> (abs (- wrist-r2 wrist-r1)) 90)
-                   (if (< wrist-r2 0)
-                       (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle (+ wrist-r2 180))
-                     (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle (- wrist-r2 180))))))
-         )
+           ;; (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
+           ;;                                        (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
+           (if (> (abs (- wrist-r2 wrist-r1)) 90)
+               (if (< wrist-r2 0)
+                   (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle (+ wrist-r2 180))
+                 (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle (- wrist-r2 180))))))
+         
 
         ((and (send n :get-value :islands) (eq (send pre-n :get-value :contact-type) 'grasp))
          (let (ep1 ep2
@@ -264,13 +305,13 @@
            (setq elbow-r2 (send *pr2* (send pre-n :get-value :arm) :elbow-r :joint-angle))
            (setq wrist-r2 (send *pr2* (send pre-n :get-value :arm) :wrist-r :joint-angle))
 
-           (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
-                                                  (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
+           ;; (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
+           ;;                                        (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
                (if (> (abs (- wrist-r2 wrist-r1)) 90)
                    (if (< wrist-r2 0)
                        (send *pr2* (send pre-n :get-value :arm) :wrist-r :joint-angle (+ wrist-r2 180))
                      (send *pr2* (send pre-n :get-value :arm) :wrist-r :joint-angle (- wrist-r2 180))))))
-         )
+         
 
         ((and (eq (send n :get-value :contact-type) 'grasp) (eq (send pre-n :get-value :contact-type) 'grasp))
          (let (ep1 ep2
@@ -285,11 +326,11 @@
            (setq elbow-r2 (send *pr2* (send n :get-value :arm) :elbow-r :joint-angle))
            (setq wrist-r2 (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle))
            
-           (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
-                                                  (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
+           ;; (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
+           ;;                                        (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
                (if (> (abs (- wrist-r2 wrist-r1)) 90)
                    (if (< wrist-r2 0)
                        (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle (+ wrist-r2 180))
                      (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle (- wrist-r2 180)))))))
-        )
+        
 )
