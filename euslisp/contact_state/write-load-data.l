@@ -11,7 +11,7 @@
 
       (if (numberp (send n :get-value :object-coords-index))
           (send n :put-value :ik-target-coords (send (send n :get-value :object-coords) :assoc (make-cascoords :coords (send (send (send (send n :get-value :object-coords) :copy-worldcoords) :translate *ik-target-shift*) :rotate (if (eq (send n :get-value :contact-point-index) 0) 0 pi/2) :y))))
-        (send n :put-value :ik-target-coords (send (send n :get-value :object-coords) :assoc (make-cascoords :coords (send (send (send (send n :get-value :object-coords) :copy-worldcoords) :rotate (if (eq (send n :get-value :object-coords-index) 'fk) 0 pi) :z) :rotate pi/2 :x))))
+        (send n :put-value :ik-target-coords (send (send n :get-value :object-coords) :assoc (make-cascoords :coords (send (send (send (send (send n :get-value :object-coords) :copy-worldcoords) :rotate (if (eq (send n :get-value :object-coords-index) 'fk) 0 pi) :z) :rotate pi/2 :x) :translate #f(15 0 0)))))
         ))))
 
 
