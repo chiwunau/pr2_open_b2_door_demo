@@ -12,7 +12,7 @@
 (load "graph-rule.l")
 (load "calc-dtau-dtheta.l")
 (load "write-load-data.l")
-;; (load "~/ros/hydro/src/jsk-ros-pkg/euslib/rbrain/virtual_interpolator.l")
+(load "~/ros/hydro/src/jsk-ros-pkg/euslib/rbrain/virtual_interpolator.l")
 ;;(load "graph-search.l")
 
 (setq *all-nodes* nil)
@@ -69,7 +69,8 @@
   (init)
   ;; (load "data/nodes-data-2016-11-12-long-ver2.dat")
   ;; (load "data/nodes-data-2016-12-18-602expdoor.dat")
-  (load "data/nodes-data-2016-12-18-73b2door.dat")
+  ;; (load "data/nodes-data-2016-12-18-73b2door.dat")
+  (load "data/nodes-data-2016-16-12-23-602expdoor.dat")
   (update-loaded-nodes) ;;put dependence in to coords
   (get-solvable-nodes)
   (setq *obs* nil)

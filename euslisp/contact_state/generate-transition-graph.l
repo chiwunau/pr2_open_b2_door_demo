@@ -137,7 +137,7 @@
         (if (send n :get-value :robot-pose-optimized)
             (play-node n :optimized t)
           (play-node n))
-;;        (send *irtviewer* :viewer :viewsurface :write-to-image-file (format nil "~A_~A" c (send n :name)))
+        ;; (send *irtviewer* :viewer :viewsurface :write-to-image-file (format nil "~A_~A" c (send n :name)))
         (incf c)
         (unix:usleep (* 1000 t-inv))))))
 
@@ -239,7 +239,7 @@
             (send *ri* :start-grasp)
 
 
-            ;;if n is dual contact, move already contacting arm first
+            ;;if n is dual contact
             (when (send n :get-value :islands)
               (let ((rn (get-node (car (send n :get-value :islands))))
                     (ln (get-node (cadr (send n :get-value :islands)))))
@@ -249,7 +249,7 @@
                     (send *ri* :stop-grasp :larm))
 
                 (let ((new-arm (if (eq (send pre-n :get-value :arm) :rarm) :larm :rarm))
-                      new-arm-av res)
+                      new-arm-av res pre-grasp-av)
                   (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
                   (setq new-arm-av (send *pr2* new-arm :angle-vector))
                   (play-node-best n :draw-objects nil)
@@ -261,6 +261,7 @@
                                               (elt diff-v 1)
                                               (vector-angle #f(1 0 0) (matrix-column (send diff-cds :worldrot) 0) #f(0 0 1))))
                   
+                  ;;move already contacting arm first
                   (setq sttm (ros::time+ (ros::time-now) (ros::time 1)))
                   (let* ((diff-torso-angle (abs (- (elt (send *ri* :state :potentio-vector) 0) (elt av 0))))
                          (min-t (* 1000 (/ diff-torso-angle 10))))
@@ -275,38 +276,59 @@
                           ))
 
                   ;;;if new contact is grasp, solve prepare posture
-                  (when (eq (send (if (eq new-arm :rarm) rn ln) :get-value :contact-type) 'grasp)
-                    (play-node-best n :draw-objects nil)
-                    (unless (send *pr2* new-arm :inverse-kinematics (send (send *pr2* new-arm :end-coords :copy-worldcoords) :translate  #f(-100 0 0)))
-                      (send *pr2* new-arm :inverse-kinematics (send (send *pr2* new-arm :end-coords :copy-worldcoords) :translate #f(-50 0 0))))
-                    (send *pr2* new-arm :elbow-r :joint-angle (refine-continuous-joint-ang (send *pr2* new-arm :elbow-r :joint-angle) 360))
-                    (send *pr2* new-arm :wrist-r :joint-angle (refine-continuous-joint-ang (send *pr2* new-arm :wrist-r :joint-angle) 180))
-
-                    (send *irtviewer* :draw-objects)
-                    (format t  "Grasp prepare posture, uSE MoveIt for ~A!~%" new-arm)
-                    (send *co* :clear-all)
-                    (dolist (obj (remove-if #'(lambda (x) (substringp "knob" (string (send x :name)))) (send *door* :links)))
-                      (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))
-                    (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm new-arm :use-torso nil))
-                    (send *ri* :wait-interpolation)
-                    (send *ri* :angle-vector (send *pr2* :angle-vector))
-                    (send *ri* :wait-interpolation)
-                    )
-                  
-                  (if res
-                      (progn 
+                  (if (eq (send (if (eq new-arm :rarm) rn ln) :get-value :contact-type) 'grasp)
+                      (progn
                         (play-node-best n :draw-objects nil)
-                        (send *ri* :angle-vector (send *pr2* :angle-vector)))
-                    (progn
+                        (setq res (send *pr2* new-arm :inverse-kinematics (send (send *pr2* new-arm :end-coords :copy-worldcoords) :translate  #f(-100 0 0))))
+                        (unless res
+                          (setq res (send *pr2* new-arm :inverse-kinematics (send (send *pr2* new-arm :end-coords :copy-worldcoords) :translate #f(-50 0 0)))))
+                        (send *pr2* new-arm :elbow-r :joint-angle (refine-continuous-joint-ang (send *pr2* new-arm :elbow-r :joint-angle) 360))
+                        (send *pr2* new-arm :wrist-r :joint-angle (refine-continuous-joint-ang (send *pr2* new-arm :wrist-r :joint-angle) 180))
+                        (when res
+                          (setq pre-grasp-av res)
+                          (print pre-grasp-av)
+                          (send *irtviewer* :draw-objects)
+                          (format t  "Grasp prepare posture, uSE MoveIt for ~A!~%" new-arm)
+                          (send *co* :clear-all)
+                          (dolist (obj (remove-if #'(lambda (x) (substringp nil (string (send x :name)))) (send *door* :links)))
+                            (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))
+                          (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm new-arm :use-torso nil))
+                          (if res
+                              (progn
+                                (send *ri* :wait-interpolation)
+                                (send *ri* :angle-vector (send *pr2* :angle-vector))
+                                (send *ri* :wait-interpolation)
+                                (play-node-best n :draw-objects nil)
+                                (send *ri* :angle-vector (send *pr2* :angle-vector)) ;;finish execute n
+                                (send *ri* :wait-interpolation))
+                            (progn ;;grasp pre pose not solved
+                              (play-node-best n :draw-objects nil)
+                              (format t  "Grasp prepare posture not solved, grasp posture use MoveIt for ~A!~%" new-arm)
+                              (send *co* :clear-all)
+                              (dolist (obj (remove-if #'(lambda (x) (substringp "knob" (string (send x :name)))) (send *door* :links)))
+                                (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))
+                              (play-node-best n :draw-objects nil)
+                              (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm new-arm :use-torso nil))
+                              (unless res
+                                (send *pr2* :angle-vector pre-grasp-av)
+                                (send *ri* :angle-vector (send *pr2* :angle-vector))
+                                (send *ri* :wait-interpolation)
+                                (play-node-best n :draw-objects nil)
+                                (send *ri* :angle-vector (send *pr2* :angle-vector))
+                                (send *ri* :wait-interpolation)
+                              )))))
+                          
+                    (progn ;;new contact is not grasp
                       (format t  "USE MoveIt for ~A!~%" new-arm)
                       (send *co* :clear-all)
-                      (dolist (obj (remove-if #'(lambda (x) (substringp "knob" (string (send x :name)))) (send *door* :links)))
+                      (dolist (obj (remove-if #'(lambda (x) (substringp nil (string (send x :name)))) (send *door* :links)))
                         (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))
                       (play-node-best n :draw-objects nil)
                       (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm new-arm :use-torso nil))
                       )
                     )
                   )))
+                  
             
             
             (play-node-best n)
@@ -342,7 +364,7 @@
               
               (dotimes (i 3)
                 (cond ((= i 0)
-                       (play-node-best next-n))
+                       (play-node-best n))
                       ((= i 1)
                        (play-middle-state n next-n 1 3))
                       ((= i 2)
@@ -350,24 +372,25 @@
 
                 (if res (return))
                 (send *co* :clear-all)
-                (dolist (obj (remove-if #'(lambda (x) (substringp "knob" (string (send x :name)))) (send *door* :links)))
+                (dolist (obj (remove-if #'(lambda (x) (substringp nil (string (send x :name)))) (send *door* :links)))
                   (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))
                 
                 
                 ;; (play-middle-state n next-n 3 6 :approach-ik)
                 ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                 (unless res
-                  (play-middle-state n next-n 1 3)
+                  ;; (play-middle-state n next-n 1 3)
+                  (play-middle-state n next-n 3 6)
                   (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                   (unless res
                     (send *pr2* :reset-pose)
-                    ;; (send *pr2* spare-arm :angle-vector (get-tuckarm (if (eq spare-arm :rarm) :larm :rarm) :outside spare-arm))
-                    ;; (send *pr2* spare-arm :shoulder-r :joint-angle (if (eq spare-arm :rarm) -100 100))
-                    (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))))))
-            )
+                    (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+                    (unless res
+                    (send *pr2* :reset-manip-pose)
+                    (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+                    ))))
+            ))
                     
-
-          ;;if n is dual contact
           (when (send n :get-value :islands)
             (let ((rn (get-node (car (send n :get-value :islands))))
                   (ln (get-node (cadr (send n :get-value :islands)))))
@@ -376,37 +399,50 @@
                   (progn
                     (send *ri* :wait-interpolation)
                     (send *ri* :start-grasp :rarm)
-                    ))
-              
+                    ))              
               (if (eq (send ln :get-value :contact-type) 'grasp) 
                   (progn
                     (send *ri* :wait-interpolation)
                     (send *ri* :start-grasp :larm)
                     ))
-              
-              (cond ((and (not (eq (send pre-n :get-value :contact-type) 'grasp)) (or (eq (send rn :get-value :contact-type) 'grasp) (eq (send rn :get-value :contact-type) 'grasp))) ;;pre not grasp -> either grasp
-                     (unix:usleep (* 1000 1000)))
-                    ((and (eq (send rn :get-value :contact-type) 'grasp) (eq (send ln :get-value :contact-type) 'grasp)) ;;pre grasp -> both grasp
-                     (unix:usleep (* 1000 1000))))
-              
-              (cond ((and (or (eq (send rn :get-value :contact-type) 'grasp) (eq (send ln :get-value :contact-type) 'grasp)) (not (eq (send next-n :get-value :contact-type) 'grasp)));;either grasp -> next no grasp
-                     (send *ri* :stop-grasp (if (eq (send next-n :get-value :arm) :rarm) :larm :rarm))
-                     (unix:usleep (* 1000 1000)))
-                    
-                    ((and (eq (send rn :get-value :contact-type) 'grasp) (eq (send ln :get-value :contact-type) 'grasp) (eq (send next-n :get-value :contact-type) 'grasp));;both grasp -> next single grasp
-                     (if (eq (send next-n :get-value :arm) :rarm)
-                         (send *ri* :stop-grasp :larm)
-                       (send *ri* :stop-grasp :rarm))
-                     (unix:usleep (* 1000 1000))))
-              
-              ;;prepare to release one contact
+
+              ;;finished moving to n
+              ;;if n is dual contact, preapre to sift to single contact
               (let ((spare-arm (if (eq (send next-n :get-value :arm) :rarm) :larm :rarm))
                     spare-arm-av res)
+              ;;stop grasp if necessary
+                (cond ((and (not (eq (send pre-n :get-value :contact-type) 'grasp)) (or (eq (send rn :get-value :contact-type) 'grasp) (eq (send rn :get-value :contact-type) 'grasp))) ;;pre not grasp -> either grasp
+                       (unix:usleep (* 1000 1000)))
+                      ((and (eq (send rn :get-value :contact-type) 'grasp) (eq (send ln :get-value :contact-type) 'grasp)) ;;pre grasp -> both grasp
+                       (unix:usleep (* 1000 1000))))
+                
+                (cond ((or (and (or (eq (send rn :get-value :contact-type) 'grasp) (eq (send ln :get-value :contact-type) 'grasp)) (not (eq (send next-n :get-value :contact-type) 'grasp)));;either grasp -> next no grasp
+                           (and (eq (send rn :get-value :contact-type) 'grasp) (eq (send ln :get-value :contact-type) 'grasp) (eq (send next-n :get-value :contact-type) 'grasp))) ;;both grasp -> next single grasp
+                       (send *ri* :stop-grasp spare-arm)
+                       (unix:usleep (* 1000 1000))
+                       (play-node-best n :draw-objects nil)
+                       (unless (send *pr2* spare-arm :inverse-kinematics (send (send *pr2* spare-arm :end-coords :copy-worldcoords) :translate  #f(-100 0 0)))
+                         (send *pr2* spare-arm :inverse-kinematics (send (send *pr2* spare-arm :end-coords :copy-worldcoords) :translate #f(-50 0 0))))
+                       (send *pr2* spare-arm :elbow-r :joint-angle (refine-continuous-joint-ang (send *pr2* spare-arm :elbow-r :joint-angle) 360))
+                       (send *pr2* spare-arm :wrist-r :joint-angle (refine-continuous-joint-ang (send *pr2* spare-arm :wrist-r :joint-angle) 180))
+                       (send *irtviewer* :draw-objects)
+                       ;; (format t  "Release prepare posture, uSE MoveIt for ~A!~%" spare-arm)
+                       ;; (send *co* :clear-all)
+                       ;; (dolist (obj (remove-if #'(lambda (x) (substringp nil (string (send x :name)))) (send *door* :links)))
+                       ;;   (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))
+                       ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+                       ;; (send *ri* :wait-interpolation)
+                       (send *ri* :angle-vector (send *pr2* :angle-vector))
+                       (send *ri* :wait-interpolation)
+                       ))
+                      
+                ;;prepare to release one contact
                 (format t  "USE MoveIt for ~A!~%" spare-arm)
                 
+                (setq res nil)
                 (dotimes (i 3)
                   (cond ((= i 0)
-                         (play-node-best next-n))
+                         (play-node-best n))
                         ((= i 1)
                          (play-middle-state n next-n 1 3))
                         ((= i 2)
@@ -414,7 +450,7 @@
 
                   (if res (return))
                   (send *co* :clear-all)
-                  (dolist (obj (remove-if #'(lambda (x) (substringp "knob" (string (send x :name)))) (send *door* :links)))
+                  (dolist (obj (remove-if #'(lambda (x) (substringp nil (string (send x :name)))) (send *door* :links)))
                     (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))
                   
                   (send *pr2* spare-arm :angle-vector (get-tuckarm (if (eq spare-arm :rarm) :larm :rarm) :outside spare-arm))
@@ -428,11 +464,13 @@
                     ;; (play-middle-state n next-n 1 3)
                     ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                     (unless res
+                      (send *pr2* :reset-manip-pose)
+                    (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                       ;; (send *pr2* spare-arm :angle-vector (get-tuckarm (if (eq spare-arm :rarm) :larm :rarm) :outside spare-arm))
-                      ;; (send *pr2* spare-arm :shoulder-r :joint-angle (if (eq spare-arm :rarm) -100 100))
-                      ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
-                      ))))
-
+                    ;; (send *pr2* spare-arm :shoulder-r :joint-angle (if (eq spare-arm :rarm) -100 100))
+                    ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+                    ))))
+              
 
               ))
           

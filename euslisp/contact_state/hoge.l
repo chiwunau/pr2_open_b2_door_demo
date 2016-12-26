@@ -319,20 +319,21 @@ all-node, 787 nodes
 (init-obstacle)
 (send *irtviewer* :objects (append (send *irtviewer* :objects) *obs-list*))
 (setq *path-list* (make-list (length *obs-list*)))
+(setq *path-valid* (make-list (length *obs-list*)))
 
 (do ((i 0 (+ i 1))) ((>= i (length *obs-list*)))
     (setq *obs* (elt *obs-list* i))
     (bench (init-graph))
-    ;; (if (send *graph* :node "l-0-s-fk")
-    ;;     (progn
-    ;;       (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
-    (solve-graph)
-    (if *path*
-        (progn (setf (elt *path-list* i) *path*)
-               (send *obs* :set-color :green))
-      (progn
-        ;; (push nil *path-list*)
-        (send *obs* :set-color :red)))
+    (setf (elt *path-list* i) (solve-graph *graph*))
+    (if (position t (mapcar #'(lambda (x) (if (send x :get-value :solved) (colide-obstacle? x))) (send-all *path* :state)));;*path*
+        (progn
+          ;; (push nil *path-list*)
+          (setf (elt *path-valid* i) nil)
+          (send *obs* :set-color :red))
+      (progn ;;(setf (elt *path-list* i) *path*)
+        (setf (elt *path-valid* i) t)
+        (send *obs* :set-color :green))
+      )
     (send *irtviewer* :draw-objects)
     )
 
@@ -340,15 +341,16 @@ all-node, 787 nodes
   (when (elt *path-list* i)
     (send (elt *obs-list* i) :set-color :yellow)
     (play-path (elt *path-list* i))
-    (send (elt *obs-list* i) :set-color :green)))
+    (if (elt *path-valid* i)
+        (send (elt *obs-list* i) :set-color :green)
+      (send (elt *obs-list* i) :set-color :red))))
 
 
 (dotimes (i (length *path-list*))
   (unless (elt *path-list* i)
     (setq *obs* (elt *obs-list* i))
     (bench (init-graph))
-    (send *graph* :start-state (send *graph* :node "r-0-s-fk"))
-    (solve-graph)
+    (solve-graph *graph*)
     (if *path*
         (progn
           (setf (elt *path-list* i) *path*)
