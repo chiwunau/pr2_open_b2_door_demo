@@ -589,11 +589,11 @@
   (let* ((max-tq (send *pr2* :max-torque-vector))
          (overload nil)
          )
-    
-    (dotimes (i (length max-tq))
-      (if (> 0 (- (* ratio (abs (elt max-tq i))) (abs (elt tq i))))
-          (setq overload t)))
-    overload))
+    (when tq
+      (dotimes (i (length max-tq))
+        (if (> 0 (- (* ratio (abs (elt max-tq i))) (abs (elt tq i))))
+            (setq overload t)))
+      overload)))
 
 
 (defun init-nodes-torque-info (&key (nodes *solvable-nodes*) (door-weight 2.5) (robot *pr2*) (door *door*))

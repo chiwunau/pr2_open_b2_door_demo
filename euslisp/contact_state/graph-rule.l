@@ -38,14 +38,39 @@
     (if (> d 0.0)
         (cond
          ((>= d d-thres)
-          (setq cost 0))
+          (setq cost 0.0))
          ((< d d-thres)
-          (setq cost (* (/ (- d-thres d) d-thres) 100.0))))
+          (setq cost (* (/ (- d-thres d) d-thres) 1.0))))
       (let ((shortest-dist (* (car (find-if #'(lambda (x) x) (send-all (send obstacle :faces) :intersect-line (send *pr2* :pos) (send obstacle :centroid))))
                               (distance (send *pr2* :pos) (send obstacle :centroid)))))
         ;; (print shortest-dist)
-        (setq cost (* 100 (- (/ 480 shortest-dist) 1)))))
+        (setq cost (* 1.0 (- (/ 480 shortest-dist) 1)))))
     cost))
+
+(defun torque-limit-cost (&key node)
+  (let* ((tq (if (send node :get-value :robot-pose-optimized) (send node :get-value :torque-optimized) (send node :get-value :torque)))
+        (max-tq (send *pr2* :max-torque-vector))
+        (tq-ratio-list (mapcar #'(lambda (tqi maxi) (abs (/ tqi maxi))) (coerce tq cons) (coerce max-tq cons)))
+        (max-ratio (reduce 'max tq-ratio-list))
+        (ratio-thres 0.6)
+        cost)
+    
+    ;; (print tq-ratio-list)
+    (cond 
+     ((<= max-ratio ratio-thres)
+      (setq cost 0.0))
+     ((and (> max-ratio ratio-thres) (<= max-ratio 1.0))
+      (setq cost (/ (- max-ratio ratio-thres) (- 1.0 ratio-thres))))
+     ((> max-ratio 1.0)
+      (setq cost (exp max-ratio))))
+    cost))
+      
+      
+      
+
+
+
+
         
 
 
