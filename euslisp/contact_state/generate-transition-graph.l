@@ -78,7 +78,9 @@
                   (send n :get-value :robot-pose)
                   (if (send ri :get-value :robot-pose-optimized) (send ri :get-value :base-coords-optimized) (send ri :get-value :base-coords))
                   (send n :get-value :base-coords))
-                 (* w-obs (/ (+ (send ri :get :obstacle-dist-cost) (send n :get :obstacle-dist-cost)) 2)))
+                 (* w-obs (/ (+ (send ri :get :obstacle-dist-cost) (send n :get :obstacle-dist-cost)) 2))
+                 (* w-tq (/ (+ (send ri :get :torque-limit-cost) (send li :get :torque-limit-cost)) 4))
+                 )
               :both t)
         (send graph :add-arc li n 
               (+ (pose-diff-cost
@@ -86,7 +88,9 @@
                   (send n :get-value :robot-pose)
                   (if (send li :get-value :robot-pose-optimized) (send li :get-value :base-coords-optimized) (send li :get-value :base-coords))
                   (send n :get-value :base-coords))
-                 (* w-obs (/ (+ (send li :get :obstacle-dist-cost) (send n :get :obstacle-dist-cost)) 2)))
+                 (* w-obs (/ (+ (send li :get :obstacle-dist-cost) (send n :get :obstacle-dist-cost)) 2))
+                 (* w-tq (/ (+ (send ri :get :torque-limit-cost) (send li :get :torque-limit-cost)) 4))
+                 )
               :both t))))
 
   ;; (when (member (get-node "r-0-0-fk") (send graph :nodes))
@@ -140,7 +144,7 @@
         (send g :remove-node n))))
 )
 
-(defun play-path (&optional (p *path*) (t-inv 300))
+(defun play-path (&key (save-image nil) &optional (p *path*) (t-inv 300) )
   (let ((ns (send-all p :state))
         (c 0))
     (dolist (n ns)
@@ -149,7 +153,8 @@
         (if (send n :get-value :robot-pose-optimized)
             (play-node n :optimized t)
           (play-node n))
-        ;; (send *irtviewer* :viewer :viewsurface :write-to-image-file (format nil "~A_~A" c (send n :name)))
+        (if save-image
+            (send *irtviewer* :viewer :viewsurface :write-to-image-file (format nil "~A_~A" c (send n :name))))
         (incf c)
         (unix:usleep (* 1000 t-inv))))))
 

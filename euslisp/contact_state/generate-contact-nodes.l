@@ -542,7 +542,7 @@
 
 (defun door-reaction-wrench (cds-on-door-plane contact-cds &key (door-weight 2.5) (door *door*))
   (let ((cds cds-on-door-plane)
-        (tau (* door-weight 9.8 700)) ;;2.5kg from handle
+        (tau (* door-weight 9.8 646)) ;;2.5kg from handle
         (moment #f(0 0 0))
         (target-cds contact-cds)
         force

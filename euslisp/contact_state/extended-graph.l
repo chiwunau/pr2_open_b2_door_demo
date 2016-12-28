@@ -32,7 +32,7 @@
                         ;;         (graphviz-node-name target-node)
                         ;;         (send target-node :name))
                         (unless (send target-node :get-value :islands)
-                          (format f "~A [label = \"~A\"];~%"
+                          (format f "~A [label = \"~A\", fontsize=100];~%"
                                   (graphviz-node-name target-node)
                                   ;; (if (send target-node :get-value :islands)
                                   ;;     (let ((a (car (send target-node :get-value :islands)))
@@ -82,7 +82,7 @@
                                               (format f "~A -> ~A [color = red, style = dashed];~%"
                                                       (graphviz-node-name (send self :node (cadr (send target-node :get-value :islands))))
                                                       (graphviz-node-name (send self :node (car (send target-node :get-value :islands))))))
-                                          (format f "~A -> ~A [dir = both, color = green, style = dashed];~%"
+                                          (format f "~A -> ~A [dir = both, color = green, style = bold];~%"
                                                   (graphviz-node-name (send self :node (car (send target-node :get-value :islands))))
                                                   (graphviz-node-name (send self :node (cadr (send target-node :get-value :islands))))))
                                         (push (cons (send self :node (car (send target-node :get-value :islands))) (send self :node (cadr (send target-node :get-value :islands)))) drawed-arc))
@@ -124,7 +124,16 @@
   ;;    (unix::system (format nil "fdp -n -Gsplines=true -Tpdf ~a -o ~a-fdp.pdf" dot-fname fname))
   ;;    (unix::system (format nil "twopi -n -Gsplines=true -Tpdf ~a -o ~a-twopi.pdf" dot-fname fname))
   ;;    t))
-
+  (:write-to-png
+   (fname &optional (title "default_title") result-path)
+   (let ((dot-fname
+          (format nil "~A.dot" fname)))
+     (send self :write-to-dot dot-fname result-path title)
+     (unix::system (format nil "dot -Tpng ~a -o ~a-dot.png" dot-fname fname))
+     ;; (unix::system (format nil "neato -Tpng ~a -o ~a-neato.png" dot-fname fname))
+     ;; (unix::system (format nil "fdp -n -Gsplines=true -Tpng ~a -o ~a-fdp.png" dot-fname fname))
+     ;; (unix::system (format nil "twopi -n -Gsplines=true -Tpng ~a -o ~a-twopi.png" dot-fname fname))
+     t))
   )
 
 (defclass extended-node
