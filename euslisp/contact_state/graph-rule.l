@@ -4,9 +4,10 @@
   (let* ((cof-p *cof-p*)
          (cof-b (- 1 cof-p))
          (cof-b-trans 1.0)
-         (cof-b-rot 1.0)
+         (cof-b-rot 0)
          (diff-p (v- p2 p1))
-         (diff-cds (send (send b1 :transformation b2) :copy-worldcoords)))
+          (diff-cds (send (send b1 :transformation b2) :copy-worldcoords)))
+         ;; (diff-cds (send (send (make-coords) :transformation b2) :copy-worldcoords)))
 
     (setf (elt diff-p 0) 0)
     (setq diff-p (deg2rad (norm diff-p)))

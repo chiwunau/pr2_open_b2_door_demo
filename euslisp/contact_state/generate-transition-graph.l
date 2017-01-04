@@ -144,17 +144,17 @@
         (send g :remove-node n))))
 )
 
-(defun play-path (&key (save-image nil) &optional (p *path*) (t-inv 300) )
-  (let ((ns (send-all p :state))
+(defun play-path (&key (path *path*) (t-inv 300) (save-image nil))
+  (let ((ns (send-all path :state))
         (c 0))
     (dolist (n ns)
       (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
-        (print n)
+        ;; (print n)
         (if (send n :get-value :robot-pose-optimized)
             (play-node n :optimized t)
           (play-node n))
         (if save-image
-            (send *irtviewer* :viewer :viewsurface :write-to-image-file (format nil "~A_~A" c (send n :name))))
+            (send *irtviewer* :viewer :viewsurface :write-to-image-file (format nil "save_image/~A_~A" c (send n :name))))
         (incf c)
         (unix:usleep (* 1000 t-inv))))))
 
@@ -260,6 +260,7 @@
 
     ;; (dotimes (i (length ns)) ;;init avs and base-cds-list
     (do ((i 0 (+ i 1))) ((>= i (length ns)))
+    ;; (do ((i 5 (+ i 1))) ((>= i 7));;(length ns)))
         (let ((n (elt ns i))
               (next-n (if (< i (- (length ns) 1)) (elt ns (+ i 1))))
               (pre-n (if (> i 0) (elt ns (- i 1)))))
@@ -285,10 +286,13 @@
                   (send *pr2* new-arm :angle-vector new-arm-av)
                   (setq av (send *pr2* :angle-vector))
                   (setq base (send *pr2* :copy-worldcoords))
+                  (setq diff-cds (send pre-base :transformation base))
                   (setq diff-v (send diff-cds :pos))
                   (setq traj-pt (float-vector (elt diff-v 0)
                                               (elt diff-v 1)
                                               (vector-angle #f(1 0 0) (matrix-column (send diff-cds :worldrot) 0) #f(0 0 1))))
+                  (setq pre-base (send *pr2* :copy-worldcoords))
+
                   
                   ;;move already contacting arm first
                   (setq sttm (ros::time+ (ros::time-now) (ros::time 1)))
@@ -297,6 +301,7 @@
                     (send *ri* :angle-vector av
                           (if (> min-t t-interval) min-t t-interval)
                           :default-controller sttm)
+                    (print traj-pt)
                     (send *ri* :move-trajectory-sequence
                           (list traj-pt)
                           (list (if (> min-t t-interval) min-t t-interval))
@@ -362,7 +367,7 @@
             
             (play-node-best n)
             (setq av (send *pr2* :angle-vector))
-            (setq base (send *pr2* :copy-worldcoords))              
+            (setq base (send *pr2* :copy-worldcoords))
             (setq diff-cds (send pre-base :transformation base))
             (setq diff-v (send diff-cds :pos))
             (setq traj-pt (float-vector (elt diff-v 0)
@@ -375,6 +380,7 @@
               (send *ri* :angle-vector av
                     (if (> min-t t-interval) min-t t-interval)
                     :default-controller sttm)
+              (print traj-pt)
               (send *ri* :move-trajectory-sequence
                     (list traj-pt)
                     (list (if (> min-t t-interval) min-t t-interval))
@@ -409,8 +415,8 @@
                 ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                 (unless res
                   ;; (play-middle-state n next-n 1 3)
-                  (play-middle-state n next-n 3 6)
-                  (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+                  ;; (play-middle-state n next-n 3 6)
+                  ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                   (unless res
                     (send *pr2* :reset-pose)
                     (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
