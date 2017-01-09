@@ -29,7 +29,12 @@
 
 
 (defun joint-state-cb (msgs)
-  (apply-joint_state msgs *pr2*))
+  (let (trans)
+    (apply-joint_state msgs *pr2*)
+    (setq trans (send *tfl* :lookup-transform "/odom_combined" "/base_footprint" (ros::time 0)))
+    (if (not *robot-start-cds*)
+        (setq *robot-start-cds* trans))
+    (send *pr2* :move-to (send *robot-start-cds* :transformation trans) :world)))
 
 (defun line-segment-cb (msgs)
   (ros::ros-info "line segment callback")
@@ -40,10 +45,10 @@
   (let ((marker-list (send msgs :markers))
         trans)
 
-    (setq trans (send *tfl* :lookup-transform "/odom_combined" "/base_footprint" (ros::time 0)))
-    (if (not *robot-start-cds*)
-        (setq *robot-start-cds* trans))
-    (send *pr2* :move-to (send *robot-start-cds* :transformation trans) :world)
+    ;; (setq trans (send *tfl* :lookup-transform "/odom_combined" "/base_footprint" (ros::time 0)))
+    ;; (if (not *robot-start-cds*)
+    ;;     (setq *robot-start-cds* trans))
+    ;; (send *pr2* :move-to (send *robot-start-cds* :transformation trans) :world)
 
     (dolist (mk marker-list)
       (let (p0 p1 l)
@@ -183,6 +188,20 @@
         (push (send *pr2* :copy-worldcoords) *all-robot-base*)
         (push refined-line-segments *all-refined-line-segments*)
         (draw-line-segments refined-line-segments))))
+
+(defun test-manip-exp (&key (max-wait-sec 0.2))
+  (clear-scene)
+  (let ((st-tm (ros::time-now))
+        (count-cb 0)
+        accumulated-line-segments
+        line-clusters
+        refined-line-segments)
+    (while (and (ros::ok) (ros::time<= (ros::time- (ros::time-now) st-tm) (ros::time max-wait-sec)))
+      (ros::sleep)
+      (ros::spin-once)
+      )
+    (push (send *pr2* :angle-vector) *all-robot-pose*)
+    (push (send *pr2* :copy-worldcoords) *all-robot-base*)))
 
 
 (defun clustering-line-segments (target &optional (ang-thres 5))
@@ -410,6 +429,10 @@
 (defun sampling ()
   (do-until-key
    (test :max-wait-sec 0.1))) ;;sampling data
+(defun sampling-manip ()
+  (do-until-key
+   (test-manip-exp :max-wait-sec 0.1))) ;;sampling data
+
 (progn (setq *all-robot-pose* (reverse *all-robot-pose*)) (print t))
 (progn (setq *all-robot-base* (reverse *all-robot-base*)) (print t))
 (progn (setq *all-refined-line-segments* (reverse *all-refined-line-segments*)) (print t))
@@ -427,9 +450,9 @@
 (setq circle-center #f(825.648 795.87 0))
 ;;(setq circle-center #f(883.01419 838.97770 0)) ;;robot_open_2
 (output_detected_door_angle)
-;; ;;-----------------------------------------------------;;
+;;; ;;-----------------------------------------------------;;
 
-(dolist (w *waypoints*) (format t "~A ~A~%" (elt w 0) (elt w 1)))
+(dolist (w *waypoints*) (format t "~A ~A ~A~%" (elt w 0) (elt w 1) (elt w 2)))
 ;; ;;----draw moving seq-------------;;;
 (dotimes (i (length *move-line-seq*))
   (if (elt *move-line-seq* i)
@@ -440,9 +463,14 @@
    (clear-scene))
 ;; ;;----draw moving seq-------------;;;
 (dotimes (i (length *final-line-seq*))
+  (draw-line-segments (list *door-plane-line*) :color :green)
   (if (elt *final-line-seq* i)
         (draw-line-segments (list (elt *final-line-seq* i)) :color :red :fat 3))
+       ;; (draw-line-segments (list (elt *final-line-seq* i)) :color :red))
   (draw-line-segments (remove (elt *final-line-seq* i) (elt *all-refined-line-segments* i)) :color :grey :fat 3)
+  ;; (draw-line-segments (remove (elt *final-line-seq* i) (elt *all-refined-line-segments* i)) :color :grey)
+  ;; (unix:usleep (* 1000 50))
+  ;; (clear-scene)
   )
 
 ;; ;;----------produce kinemaitc model graph of thesis--------------------;;
@@ -452,30 +480,30 @@
 ;;   (send *irtviewer* :objects *door*))
 ;; ;;----------produce kinemaitc model graph of thesis--------------------;;
 
-(let (norm-errors)
-  (dolist (rc *rotation-centers*)
-    (if rc
-        (push (norm (v- circle-center rc)) norm-errors)
-      (push nil norm-errors)))
-  (setq norm-errors (reverse norm-errors))
-  norm-errors)
+;; (let (norm-errors)
+;;   (dolist (rc *rotation-centers*)
+;;     (if rc
+;;         (push (norm (v- circle-center rc)) norm-errors)
+;;       (push nil norm-errors)))
+;;   (setq norm-errors (reverse norm-errors))
+;;   norm-errors)
 
-(dolist (rc *rotation-centers*)
-  (if rc
-      (let ((c (make-cube 15 10 15)))
-        (send c :translate rc)
-        (send c :set-color :red)
-        (send *irtviewer* :objects c))))
-(let ((c (make-cube 15 10 15)))
-  (send c :translate circle-center)
-  (send c :set-color :blue)
-  (send *irtviewer* :objects c))
+;; (dolist (rc *rotation-centers*)
+;;   (if rc
+;;       (let ((c (make-cube 15 10 15)))
+;;         (send c :translate rc)
+;;         (send c :set-color :red)
+;;         (send *irtviewer* :objects c))))
+;; (let ((c (make-cube 15 10 15)))
+;;   (send c :translate circle-center)
+;;   (send c :set-color :blue)
+;;   (send *irtviewer* :objects c))
 
 
-(let ((c (make-cube 15 10 15)))
-  (send c :translate #f(883.01419 838.97770 0)) ;;extimated from end effector
-  (send c :set-color :yellow)
-  (send *irtviewer* :objects c))
+;; (let ((c (make-cube 15 10 15)))
+;;   (send c :translate #f(883.01419 838.97770 0)) ;;extimated from end effector
+;;   (send c :set-color :yellow)
+;;   (send *irtviewer* :objects c))
 
 
 
@@ -496,9 +524,13 @@
   ;; (unix:usleep (* 1000 500))
   
 
-(send c :translate #f(0  678 -945))
-(send c :translate #f(60 0 0))
+;; (send c :translate #f(0  678 -945))
+;; (send c :translate #f(60 0 0))
 
 
+;; (dotimes (i (length *all-robot-pose*))
+;;   (send *pr2* :angle-vector (elt *all-robot-pose* i))
+;;   (send *pr2* :move-to (elt *all-robot-base* i) :world)
+;;   (send *irtviewer* :draw-objects))
 ;;ground_true of robot_1
 ;;(#<coordinates #Xa0f6ba8  786.307 837.782 4.039 / -0.025 0.0 0.0> #<cascaded-coords #X8499290 :larm-end-coords  769.062 160.001 949.039 / 0.054 -0.039 1.223> #<pr2-sensor-robot #X716c3a0 pr2  0.0 0.0 0.0 / 0.0 0.0 0.0>)

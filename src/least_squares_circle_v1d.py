@@ -12,9 +12,11 @@ from numpy import *
 x_tmp = []
 y_tmp = []
 
-with open("../euslisp/data/robot_open_2_waypoints.txt") as f:
+# with open("../euslisp/data/robot_open_2_waypoints.txt") as f:
+with open("../euslisp/data/2016_12_15_manip_exp/feed_back_door_waypoints.txt") as f:
     for line in f.readlines():
         nums = line.split()
+        print nums
         x_tmp.append(float(nums[0]))
         y_tmp.append(float(nums[1]))
 
@@ -273,21 +275,21 @@ def plot_all(residu2=False):
 
     theta_fit = linspace(-pi, pi, 180)
 
-    x_fit1 = xc_1 + R_1*cos(theta_fit)
-    y_fit1 = yc_1 + R_1*sin(theta_fit)
-    p.plot(x_fit1, y_fit1, 'b-' , label=method_1, lw=2)
+    # x_fit1 = xc_1 + R_1*cos(theta_fit)
+    # y_fit1 = yc_1 + R_1*sin(theta_fit)
+    # p.plot(x_fit1, y_fit1, 'b-' , label=method_1, lw=2)
 
     x_fit2 = xc_2 + R_2*cos(theta_fit)
     y_fit2 = yc_2 + R_2*sin(theta_fit)
     p.plot(x_fit2, y_fit2, 'k--', label=method_2, lw=2)
 
-    x_fit3 = xc_3 + R_3*cos(theta_fit)
-    y_fit3 = yc_3 + R_3*sin(theta_fit)
-    p.plot(x_fit3, y_fit3, 'r-.', label=method_3, lw=2)
+    # x_fit3 = xc_3 + R_3*cos(theta_fit)
+    # y_fit3 = yc_3 + R_3*sin(theta_fit)
+    # p.plot(x_fit3, y_fit3, 'r-.', label=method_3, lw=2)
 
-    p.plot([xc_1], [yc_1], 'bD', mec='y', mew=1)
+    # p.plot([xc_1], [yc_1], 'bD', mec='y', mew=1)
     p.plot([xc_2], [yc_2], 'gD', mec='r', mew=1)
-    p.plot([xc_3], [yc_3], 'kD', mec='w', mew=1)
+    # p.plot([xc_3], [yc_3], 'kD', mec='w', mew=1)
 
     # draw
     p.xlabel('x')
