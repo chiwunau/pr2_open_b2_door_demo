@@ -312,6 +312,10 @@
            
            ;; (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
            ;;                                        (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
+           (if (> (abs (- elbow-r2 elbow-r1)) 180)
+               (if (< elbow-r2 0)
+                   (send *pr2* (send n :get-value :arm) :elbow-r :joint-angle (+ elbow-r2 360))
+                 (send *pr2* (send n :get-value :arm) :elbow-r :joint-angle (- elbow-r2 360))))
            (if (> (abs (- wrist-r2 wrist-r1)) 90)
                (if (< wrist-r2 0)
                    (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle (+ wrist-r2 180))
@@ -333,6 +337,10 @@
 
            ;; (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
            ;;                                        (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
+           (if (> (abs (- elbow-r2 elbow-r1)) 180)
+               (if (< elbow-r2 0)
+                   (send *pr2* (send pre-n :get-value :arm) :elbow-r :joint-angle (+ elbow-r2 360))
+                 (send *pr2* (send pre-n :get-value :arm) :elbow-r :joint-angle (- elbow-r2 360))))
            (if (> (abs (- wrist-r2 wrist-r1)) 90)
                    (if (< wrist-r2 0)
                        (send *pr2* (send pre-n :get-value :arm) :wrist-r :joint-angle (+ wrist-r2 180))
@@ -354,6 +362,10 @@
            
            ;; (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
            ;;                                        (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
+           (if (> (abs (- elbow-r2 elbow-r1)) 180)
+               (if (< elbow-r2 0)
+                   (send *pr2* (send n :get-value :arm) :elbow-r :joint-angle (+ elbow-r2 360))
+                 (send *pr2* (send n :get-value :arm) :elbow-r :joint-angle (- elbow-r2 360))))
                (if (> (abs (- wrist-r2 wrist-r1)) 90)
                    (if (< wrist-r2 0)
                        (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle (+ wrist-r2 180))

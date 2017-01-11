@@ -228,7 +228,7 @@
 
 
 (defun execute-robot-motion-one-by-one (&optional (p *path*))
-  (let ((t-interval 2000.0) ;msec
+  (let ((t-interval 5000.0) ;msec
         (ns (send-all p :state))
         avs
         base-cds-list
@@ -364,7 +364,7 @@
                   )))
                   
             
-            
+            (send *ri* :wait-interpolation)
             (play-node-best n)
             (setq av (send *pr2* :angle-vector))
             (setq base (send *pr2* :copy-worldcoords))
@@ -397,6 +397,7 @@
                   spare-arm-av res)
               (format t  "USE MoveIt for ~A!~%" spare-arm)
               
+              (send *co* :clear-all)
               (dotimes (i 3)
                 (cond ((= i 0)
                        (play-node-best n))
@@ -405,26 +406,30 @@
                       ((= i 2)
                        (play-node-best next-n)))
 
-                (if res (return))
-                (send *co* :clear-all)
-                (dolist (obj (remove-if #'(lambda (x) (substringp nil (string (send x :name)))) (send *door* :links)))
-                  (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))
+                ;; (if res (return))
+                ;; (send *co* :clear-all)
+                (let ((tmp-door (copy-object *door*)))
+                (dolist (obj (remove-if #'(lambda (x) (substringp nil (string (send x :name)))) (send tmp-door :links)))
+                  (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))))
                 
                 
                 ;; (play-middle-state n next-n 3 6 :approach-ik)
                 ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+              (play-node-best n)
+              (unless res
+                ;; (play-middle-state n next-n 1 3)
+                ;; (play-middle-state n next-n 3 6)
+                (pr2-relax-pose)
+                (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                 (unless res
-                  ;; (play-middle-state n next-n 1 3)
-                  ;; (play-middle-state n next-n 3 6)
-                  ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+                  (send *pr2* :reset-pose)
+                  (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                   (unless res
-                    (send *pr2* :reset-pose)
-                    (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
-                    (unless res
                     (send *pr2* :reset-manip-pose)
                     (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                     ))))
-            ))
+            )
+          (send *co* :clear-all)
                     
           (when (send n :get-value :islands)
             (let ((rn (get-node (car (send n :get-value :islands))))
@@ -558,6 +563,12 @@
           (push c cube-list))))
 
     (setq *obs-list* (reverse cube-list))))
+
+
+(defun pr2-relax-pose ()
+  (send *pr2* :larm :angle-vector #f(66.0749 39.4186 172.313 -70.4624 2.60698 -5.72958 -10.1163))
+  (send *pr2* :rarm :angle-vector #f(-66.0749 39.4186 -172.313 -70.4624 2.60698 -5.72958 -10.1163))
+  )
         
 
     
