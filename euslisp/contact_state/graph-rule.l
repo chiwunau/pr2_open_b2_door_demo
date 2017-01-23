@@ -13,13 +13,6 @@
     (setq diff-p (deg2rad (norm diff-p)))
     (setq diff-b (+ (* cof-b-trans (/ (norm (send diff-cds :pos)) 1000))
                     (* cof-b-rot (abs (car (car (send diff-cds :rpy-angle)))))))
-
-    ;; (format a "~A~%" diff-p)
-    ;; (format b "~A~%" diff-b)
-    ;; (format c "~A~%" (/ (norm (send diff-cds :pos)) 1000))
-    ;; (format d "~A~%" (abs (car (car (send diff-cds :rpy-angle)))))
-    ;; (format t "~A, ~A, " diff-p diff-b)
-    ;; (format t "~A, ~A~%" (/ (norm (send diff-cds :pos)) 1000) (abs (car (car (send diff-cds :rpy-angle)))))
     (+ (* cof-p diff-p) (* cof-b diff-b))))
 
 (defun obstacle-dist-cost (&key node obstacle)
@@ -56,7 +49,6 @@
         (ratio-thres 0.6)
         cost)
     
-    ;; (print tq-ratio-list)
     (cond 
      ((<= max-ratio ratio-thres)
       (setq cost 0.0))
@@ -67,34 +59,6 @@
     cost))
       
       
-      
-
-
-
-
-        
-
-
-;; (defun overload-node? (n &optional (door-weight 2.5))
-;;   (let* ((force-cds (elt (send n :get :cds-info) 0))
-;;          ;;             (contact-pt (elt (send n :get :cds-info) 2))
-;;          (contact-pt (elt (reverse (set-contact-points (send n :get :arm))) (send n :get :contact-point)))
-;;          (max-tq (send *pr2* :max-torque-vector))
-;;          (overload nil)
-;;          drw tq)
-;;     (send *pr2* :angle-vector (send n :get :pose))
-;;     (send *pr2* :move-to (send n :get :base) :world)
-;;     (send *door* :hinge :joint-angle (send n :get :door-angle))
-    
-;;     (setq drw (door-reaction-wrench force-cds contact-pt door-weight))
-;;     (setq tq (send *pr2* :calc-torque-from-ext-wrenches :force-list (list (car drw)) :moment-list (list (cadr drw)) :target-coords (list contact-pt)))
-    
-;;     (dotimes (i (length max-tq))
-;;       (if (> 0 (- (abs (elt max-tq i)) (abs (elt tq i))))
-;;           (setq overload t)))
-
-;;     overload))
-
 (defun colide-obstacle? (n)
   (unless *obs*
     (return-from colide-obstacle? nil))
@@ -111,23 +75,6 @@
        *obs*
      (list *obs*)))
   )
-
-  
-  
-
-
-;; (defun transitable? (n1 n2)
-;;   (let* ((mid-pose (cadr (cadr (pos-list-interpolation (list (send n1 :get-value :pose) (send n2 :get-value :pose)) (list 1000) 500))))
-;;          (diff-cds (send (send (send n1 :get-value :base) :transformation (send n2 :get-value :base)) :copy-worldcoords))
-;;          (mid-cds (send (send (send (send n1 :get-value :base) :copy-worldcoords) :translate (scale 0.5 (send diff-cds :pos))) :rotate (* 0.5 (caar (send diff-cds :rpy-angle))) :z))
-;;          (mid-door-angle (/ (+ (send n1 :get-value :door-angle) (send n2 :get-value :door-angle)) 2)))
-
-;;     (send *pr2* :angle-vector mid-pose)
-;;     (send *pr2* :move-to mid-cds :world)
-;;     (send *door* :hinge :joint-angle mid-door-angle)
-;;     t
-;;    (not (pqp-collision-check-objects (append (send *pr2* :torso :parent-link) (send *pr2* (send n1 :get-value :arm) :links))  (send *door* :links)))
-;;     ))
 
 (defun play-middle-state (n1 n2 a b)
   (let* ((pose-pli (pos-list-interpolation (list (if (send n1 :get-value :robot-pose-optimized)
@@ -153,8 +100,7 @@
                         :rotate (elt (elt (cadr base-pli) a) 3) :z))
          )
     
-    ;; (setq *pose-pli* pose-pli)
-    ;; (setq *mid-cds* mid-cds)
+
     (send *door* :hinge :joint-angle (+ (send n1 :get-value :door-angle) (* a (/ (- (send n2 :get-value :door-angle) (send n1 :get-value :door-angle)) (- b 1)))))
     (send *pr2* :angle-vector (elt (cadr pose-pli) a))
     (send *pr2* :move-to mid-cds :world)
@@ -166,13 +112,11 @@
 
 
 (defun transitable? (n1 n2)
-(return-from transitable? t) ;;for-debug
+(return-from transitable? t) ;;recently return only t (for same contact point)
   (let* ((pose-pli (pos-list-interpolation (list (send n1 :get-value :pose) (send n2 :get-value :pose)) (list 750) 250))
          (diff-cds (send (send (send n1 :get-value :base) :transformation (send n2 :get-value :base)) :copy-worldcoords))
          (base-pos-rot-v (coerce (append (coerce (send diff-cds :pos) cons) (list (caar (send diff-cds :rpy-angle)))) float-vector))
          (base-pli (pos-list-interpolation (list (coerce (make-list (length base-pos-rot-v) :initial-element 0) float-vector) base-pos-rot-v) (list 750) 250)))
-;;         (mid-cds (send (send (send (send n1 :get-value :base) :copy-worldcoords) :translate (scale 0.5 (send diff-cds :pos))) :rotate (* 0.5 (caar (send diff-cds :rpy-angle))) :z))
-  ;;       (mid-door-angle (/ (+ (send n1 :get-value :door-angle) (send n2 :get-value :door-angle)) 2)))
 
     (dotimes (i (length (cadr pose-pli)))
       (let ((mid-cds (send (send (send (send n1 :get-value :base) :copy-worldcoords)
@@ -182,24 +126,15 @@
         (send *pr2* :angle-vector (elt (cadr pose-pli) i))
         (send *pr2* :move-to mid-cds :world)
         (send *door* :hinge :joint-angle (+ mid-door-angle -3))
-        ;; (print (elt (cadr pose-pli) i))
-        ;; (print mid-cds)
-        ;; (print mid-door-angle)
-     ;; (print mid-door-angle)
-     ;; (send *irtviewer* :draw-objects)
-     ;; (unix::usleep (* 1000 500))
         (let (tmpl) 
           (dolist (dl (send *door* :links)) (unless (string-equal (send dl :name) "rear-knob")
                                                 (push dl tmpl)))
           (when (or (pqp-collision-check-objects (append (send *pr2* :torso :parent-link) (send *pr2* (send n1 :get-value :arm) :links)) (send *door* :links)) (check-arm-self-collision (send n1 :get-value :arm)))
-            ;; (send *irtviewer* :draw-objects)
-            ;; (unix::usleep (* 1000 500))
             (return-from transitable? nil))
           (dotimes (i 90) ;;make sure robot's arm do not collide with rear knob
             (when (pqp-collision-check-objects (send *pr2* (send n1 :get-value :arm)  :links) (list (elt (send *door* :links) (position "rear-knob" (send-all (send *door* :links) :name) :test 'string-equal))))
               (return-from transitable? nil))
             (send *door* :hinge :joint-angle (+ i -90))
-;;            (send *irtviewer* :draw-objects)
             )
         )))
     t))
@@ -310,8 +245,6 @@
            (setq elbow-r2 (send *pr2* (send n :get-value :arm) :elbow-r :joint-angle))
            (setq wrist-r2 (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle))
            
-           ;; (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
-           ;;                                        (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
            (if (> (abs (- elbow-r2 elbow-r1)) 180)
                (if (< elbow-r2 0)
                    (send *pr2* (send n :get-value :arm) :elbow-r :joint-angle (+ elbow-r2 360))
@@ -335,8 +268,6 @@
            (setq elbow-r2 (send *pr2* (send pre-n :get-value :arm) :elbow-r :joint-angle))
            (setq wrist-r2 (send *pr2* (send pre-n :get-value :arm) :wrist-r :joint-angle))
 
-           ;; (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
-           ;;                                        (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
            (if (> (abs (- elbow-r2 elbow-r1)) 180)
                (if (< elbow-r2 0)
                    (send *pr2* (send pre-n :get-value :arm) :elbow-r :joint-angle (+ elbow-r2 360))
@@ -360,8 +291,6 @@
            (setq elbow-r2 (send *pr2* (send n :get-value :arm) :elbow-r :joint-angle))
            (setq wrist-r2 (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle))
            
-           ;; (if (and (< (norm (v- ep1 ep2)) 5) (or (and (> (- elbow-r2 elbow-r1) 0) (> (- wrist-r2 wrist-r1) 0))
-           ;;                                        (and (< (- elbow-r2 elbow-r1) 0) (< (- wrist-r2 wrist-r1) 0))))
            (if (> (abs (- elbow-r2 elbow-r1)) 180)
                (if (< elbow-r2 0)
                    (send *pr2* (send n :get-value :arm) :elbow-r :joint-angle (+ elbow-r2 360))
