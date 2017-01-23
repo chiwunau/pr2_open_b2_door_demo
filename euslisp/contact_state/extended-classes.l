@@ -1,44 +1,5 @@
 (defmethod cascaded-link
-  ;; (:calc-torque-from-ext-wrenches
-  ;;  (&key (force-list) (moment-list) (target-coords) ((:jacobi tmp-jacobi)))
-  ;;  (let* ((link-list (mapcar #'(lambda (tc) (send self :link-list (send tc :parent))) target-coords))
-  ;;         (jacobi
-  ;;          (if tmp-jacobi
-  ;;              tmp-jacobi
-  ;;            (send self :calc-jacobian-from-link-list
-  ;;                  link-list
-  ;;                  :move-target target-coords
-  ;;                  :transform-coords (mapcar #'(lambda (x) (make-coords)) target-coords)
-  ;;                  :rotation-axis (make-list (length target-coords) :initial-element t)
-  ;;                  :translation-axis (make-list (length target-coords) :initial-element t))
-  ;;            ))
-  ;;         (wrenches
-  ;;          (mapcar #'(lambda (f m) (concatenate float-vector f m)) force-list moment-list))
-  ;;         (tq (transform (transpose jacobi)
-  ;;                        (apply #'concatenate float-vector wrenches)))
-  ;;         (ret-tq (instantiate float-vector (length joint-list)))
-  ;;         (ul (send self :calc-union-link-list link-list)))
-  ;;    ;; tq = torque vector included in link-list                                                                            
-  ;;    ;; ret-tq = all torque vector in joint-list
-  ;;    (dotimes (i (length ul))
-  ;;      (if (position (send (elt ul i) :joint) joint-list)
-  ;;          (setf (elt ret-tq (position (send (elt ul i) :joint) joint-list)) (elt tq i))))
-  ;;    ret-tq))
-
-   ;; (:calc-joint-angle-speed-gain
-   ;; (union-link-list dav periodic-time)
-   ;; ;; (setq *ullj* (send-all union-link-list :joint))
-   ;; ;; (setq *ull* union-link-list)
-   ;; (let* ((fik-len (send self :calc-target-joint-dimension union-link-list))
-   ;;        (av (instantiate float-vector fik-len)) j)
-   ;;   (do* ((i 0 (+ i (send j :joint-dof)))
-   ;;         (l 0 (1+ l)))
-   ;;       ((>= l (length union-link-list)))
-   ;;     (setq j (send (elt union-link-list l) :joint))
-   ;;     (dotimes (k (send j :joint-dof))
-   ;;       (setf (elt av (+ i k)) (send j :calc-angle-speed-gain dav i periodic-time))))
-   ;;   av))
- (:calc-torque-from-ext-wrenches-with-base
+  (:calc-torque-from-ext-wrenches-with-base
    (&key (force-list) (moment-list) (target-coords) (link-list nil) ((:jacobi tmp-jacobi)))
    (unless link-list
      (setq link-list (mapcar #'(lambda (tc) (send self :link-list (send tc :parent))) target-coords)))
@@ -68,11 +29,7 @@
   )
 
 
-
 (defmethod pr2-robot
-  ;; (:get-virtual-link-list 
-  ;;  ()
-  ;;  link-list-with-virtual-link)
   (:inverse-kinematics
    (target-coords &rest args &key (link-list) (move-arm)
                   (use-torso t) (move-target) (stop 300)
