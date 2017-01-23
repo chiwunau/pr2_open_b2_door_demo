@@ -1,4 +1,4 @@
-(setq *cof-p* 0.0)
+(setq *cof-p* 0.03)
 (defun pose-diff-cost
   (p1 p2 b1 b2) ;;pose1(reccent) pose2(next) base1(reccent) base2(next)
   (let* ((cof-p *cof-p*)
@@ -284,7 +284,7 @@
         (let ((n (elt ns i))
               (next-n (if (< i (- (length ns) 1)) (elt ns (+ i 1))))
               (pre-n (if (> i 0) (elt ns (- i 1)))))
-          (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
+          (unless (or (= (position n ns) 0) (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
             (play-node-best n :draw-objects nil)
             (same-end-coords-force-elbow-wrist-counter-rotate pre-n n)
             (if (send n :get-value :robot-pose-optimized)
@@ -372,4 +372,4 @@
                      (send *pr2* (send n :get-value :arm) :wrist-r :joint-angle (- wrist-r2 180))))))
         )
   
-)
+  )
