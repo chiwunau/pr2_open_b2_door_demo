@@ -8,8 +8,7 @@
 (load "extended-classes.l")
 (load "extended-graph.l")
 (load "graph-rule.l")
-(load "calc-dtau-dtheta.l")
-(load "write-load-data.l")
+(load "optimize-posture-joint-loads/calc-dtau-dtheta.l")
 (load "~/ros/hydro/src/jsk-ros-pkg/euslib/rbrain/virtual_interpolator.l")
 
 (setq *all-nodes* nil)
