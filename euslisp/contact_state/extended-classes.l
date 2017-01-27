@@ -1,7 +1,9 @@
 (defmethod cascaded-link
-  (:calc-torque-from-ext-wrenches
-   (&key (force-list) (moment-list) (target-coords) ((:jacobi tmp-jacobi)))
-   (let* ((link-list (mapcar #'(lambda (tc) (send self :link-list (send tc :parent))) target-coords))
+  (:calc-torque-from-ext-wrenches-with-base
+   (&key (force-list) (moment-list) (target-coords) (link-list nil) ((:jacobi tmp-jacobi)))
+   (unless link-list
+     (setq link-list (mapcar #'(lambda (tc) (send self :link-list (send tc :parent))) target-coords)))
+   (let* (
           (jacobi
            (if tmp-jacobi
                tmp-jacobi
@@ -18,12 +20,13 @@
                          (apply #'concatenate float-vector wrenches)))
           (ret-tq (instantiate float-vector (length joint-list)))
           (ul (send self :calc-union-link-list link-list)))
-     ;; tq = torque vector included in link-list                                                                            
-     ;; ret-tq = all torque vector in joint-list
+     ;; tq = torque vector included in link-list                                                      
+     ;; ret-tq = all torque vector in joint-list                                                      
      (dotimes (i (length ul))
-       (if (position (send (elt ul i) :joint) joint-list)
-           (setf (elt ret-tq (position (send (elt ul i) :joint) joint-list)) (elt tq i))))
-     ret-tq)))
+       (setf (elt ret-tq (position (send (elt ul i) :joint) joint-list)) (elt tq i)))
+     ret-tq))
+  
+  )
 
 
 (defmethod pr2-robot
@@ -84,32 +87,39 @@
                           (send start-coords :difference-position self)
                           (send start-coords :difference-rotation self)))
        (send self :move-to start-coords :world)
-       (with-append-root-joint
-        (ll self link-list
-            :joint-class omniwheel-joint
-            :joint-args base-range)
-        (send (caar ll) :joint :joint-angle
-              (float-vector (elt diff-pos-rot 0)
-                            (elt diff-pos-rot 1)
-                            (rad2deg (elt diff-pos-rot 5))))
-        (setq *link-list-with-virtual-link* ll) ;;for calc-dtau-dtheta ;;au
-        (send-super* :inverse-kinematics target-coords
-                     :rthre rthre
-                     :thre thre
-                     :stop stop
-                     :additional-weight-list
-                     (append
-                      (list
-                       (list (send self :torso_lift_joint :child-link)
-                             (if (numberp use-torso) use-torso 0.005))
-                       (list (car (send self :links))
-                             (if (eq use-base t) 0.1 use-base))
-                       )
-                      additional-weight-list
-                      )
-                     :link-list (car ll) ;; link-list
-                     :move-target move-target
-                    args)))
+       (let ((res (with-append-root-joint
+                   (ll self link-list
+                       :joint-class omniwheel-joint
+                       :joint-args base-range)
+                   (send (caar ll) :joint :joint-angle
+                         (float-vector (elt diff-pos-rot 0)
+                                       (elt diff-pos-rot 1)
+                                       (rad2deg (elt diff-pos-rot 5))))
+                   ;; (setq link-list-with-virtual-link ll)
+                   (send self :put :link-list-with-virtual-link ll)
+                   ;; (warn (format nil "link list=~A~%" ll))
+                   ;; (setq link-list-with-virtual-link ll) ;;for calc-dtau-dtheta ;;au
+                   (send-super* :inverse-kinematics target-coords
+                                :rthre rthre
+                                :thre thre
+                                :stop stop
+                                :additional-weight-list
+                                (append
+                                 (list
+                                  (list (send self :torso_lift_joint :child-link)
+                                        (if (numberp use-torso) use-torso 0.005))
+                                  (list (car (send self :links))
+                                        (if (eq use-base t) 0.1 use-base))
+                                  )
+                                 additional-weight-list
+                                 )
+                                :link-list ll ;; link-list
+                                :move-target move-target
+                                args))))
+         ;; (warn (format nil "--------------------------~%"))
+         (send self :remprop :link-list-with-virtual-link)
+         res)
+       )
       (t
        (send-super* :inverse-kinematics target-coords
                     :rthre rthre

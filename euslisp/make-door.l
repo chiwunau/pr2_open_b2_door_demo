@@ -16,7 +16,7 @@
 	   
 	   (setq b (make-cube 50 (+ door-radius 95) (* 2 knob-height)))
 	   (send b :locate (float-vector 25 (/ (+ door-radius 95) -2.0) knob-height))
-	   (send b :set-color :green)
+	   (send b :set-color :yellow 0.8)
 	   (setq l2 (instance bodyset-link :init (make-cascoords) :bodies (list b) :name 'door-plate))
 	   (send l2 :assoc l3)
 	   (send l2 :locate #f(0 -25 0))
