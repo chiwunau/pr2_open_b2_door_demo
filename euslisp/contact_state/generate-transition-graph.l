@@ -8,13 +8,11 @@
     
     (send-all nodes :remove-all-arcs)
     (send-all bridge-nodes :remove-all-arcs)
-;;     ;; (send start-node :remove-all-arcs)
-;;     ;; (send goal-node :remove-all-arcs)
     
     (send graph :add-node start-node)
     (send graph :add-node goal-node)
 
-;;   ;;add nodes to graph
+    ;;add nodes to graph
     (let ((start-depth 0)
           (goal-depth (- *graph-depth* 1)))
       (dolist (n nodes)
@@ -38,7 +36,6 @@
                 (when (member n2 (send graph :nodes))
                   (if (and (not (member goal-node (send n2 :neighbors))) (equal (send n2 :get-value :graph-depth) goal-depth)) ;;add end node
                       (send graph :add-arc n2 goal-node 1 :both nil))
-                  ;; (when (and (not (colide-obstacle? n1)) (not (colide-obstacle? n2)) (not (send n1 :get-value :overload?)) (not (send n2 :get-value :overload?)))
                   (cond 
                    ((or (eq (send n1 :get-value :contact-type) 'grasp) (eq (send n2 :get-value :contact-type) 'grasp)) ;;when either node is grasp knob
                     (if (and (equal (send n1 :get-value :object-coords-index) (send n2 :get-value :object-coords-index)) (equal (send n1 :get-value :arm) (send n2 :get-value :arm)))
@@ -65,7 +62,6 @@
                     )
                    )))))))
   )
-;;  (clear-zero-relation-nodes graph)
   (dolist (n *bridge-nodes*)
     (send n :put :obstacle-dist-cost (obstacle-dist-cost :node n :obstacle *obs*))
     (let ((ri (get-node (car (send n :get-value :islands))))
@@ -93,14 +89,6 @@
                  )
               :both t))))
 
-  ;; (when (member (get-node "r-0-0-fk") (send graph :nodes))
-  ;;   (send graph :add-node (car *start-nodes*))
-  ;;   (send graph :add-arc (car *start-nodes*) (get-node "r-0-0-fk") 1 :both nil))
-
-  ;; (when (member (get-node "l-0-0-fk") (send graph :nodes))
-  ;;   (send graph :add-node (cadr *start-nodes*))
-  ;;   (send graph :add-arc (cadr *start-nodes*) (get-node "l-0-0-fk") 1 :both nil))
-
   (setq *graph* graph)
   (set-start-goal-state)
   ))
@@ -111,7 +99,6 @@
       (:hn (n p)
            0.0))
     (setq solver (instance a*-graph-search-solver :init g))
-    ;; (setq *solver* (instance depth-first-graph-search-solver))
     (setq path (send solver :solve g :verbose nil))
     (setq *path* path)
     path)
@@ -127,8 +114,6 @@
 (defun set-start-goal-state ()
  (send *graph* :start-state (send *graph* :node "start"))
   (send *graph* :goal-state (send *graph* :node "goal"))
-  ;; (send *graph* :start-state (send *graph* :node "r-0-s-fk"))
-  ;; (send *graph* :start-state (send *graph* :node "l-0-s-fk"))
 )
 
 
@@ -149,7 +134,6 @@
         (c 0))
     (dolist (n ns)
       (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
-        ;; (print n)
         (if (send n :get-value :robot-pose-optimized)
             (play-node n :optimized t)
           (play-node n))
@@ -170,65 +154,8 @@
         (c (colide-obstacle? n)))
     (format t "Node:~A Overload:~A Collision:~A~%" (send n :name) o c)))
 
-(defun execute-robot-motion (&optional (p *path*))
-  (let ((t-interval 5000.0) ;msec
-        (ns (send-all p :state))
-        avs
-        base-cds-list
-        traj-points
-        diff-v
-        diff-cds
-        sttm)
-
-    (dolist (n ns)
-      (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
-        (if (send n :get-value :robot-pose-optimized)
-            (progn (push (send n :get-value :robot-pose-optimized) avs)
-                   (push (send n :get-value :base-coords-optimized) base-cds-list))
-          (progn (push (send n :get-value :robot-pose) avs)
-                 (push (send n :get-value :base-coords) base-cds-list)))))
-
-    (setq avs (reverse avs))
-    (setq base-cds-list (reverse base-cds-list))
-          
-    (send *pr2* :move-to (elt base-cds-list 0) :world)
-    (dotimes (i (length base-cds-list))
-      ;; (if (= i 0)
-          (setq diff-cds (send (send *pr2* :copy-worldcoords) :transformation (elt base-cds-list i)))
-        ;; (setq diff-cds (send (elt base-cds-list (- i 1)) :transformation (elt base-cds-list i))))
-          (setq diff-v (send diff-cds :pos))
-          (push (float-vector (elt diff-v 0)
-                              (elt diff-v 1)
-                              (vector-angle #f(1 0 0) (matrix-column (send diff-cds :worldrot) 0) #f(0 0 1)))
-                              traj-points))
-
-    (send *ri* :angle-vector (car avs) 1000)
-    (unix::usleep (* 1000 1000))
-    (send *ri* :wait-interpolation)
-
-    (do-until-key 
-     (print "press key")
-     (unix::usleep (* 1000 1000)))
-    (setq sttm (ros::time+ (ros::time-now) (ros::time 2)))
-    (setq *traj-points* traj-points)
-    (setq *base-cds-list* base-cds-list)
-    (setq *avs* avs)
-
-    (print "check1")
-    (send *ri* :angle-vector-sequence avs 
-          (make-list (length avs) :initial-element t-interval)
-          :default-controller sttm)
-    (print "check")
-    (send *ri* :move-trajectory-sequence 
-          (reverse traj-points)
-          (make-list (length base-cds-list) :initial-element t-interval)
-          :start-time sttm
-          :send-action t)
-    ))
-
-
 (defun execute-robot-motion-one-by-one (&optional (p *path*))
-  (let ((t-interval 2000.0) ;msec
+  (let ((t-interval 5000.0) ;msec
         (ns (send-all p :state))
         avs
         base-cds-list
@@ -258,16 +185,12 @@
     (send *ri* :start-grasp)
     
 
-    ;; (dotimes (i (length ns)) ;;init avs and base-cds-list
     (do ((i 0 (+ i 1))) ((>= i (length ns)))
-    ;; (do ((i 5 (+ i 1))) ((>= i 7));;(length ns)))
         (let ((n (elt ns i))
               (next-n (if (< i (- (length ns) 1)) (elt ns (+ i 1))))
               (pre-n (if (> i 0) (elt ns (- i 1)))))
           (unless (or (string-equal (send n :name) 'start) (string-equal (send n :name) 'goal))
-          ;; (same-end-coords-force-elbow-wrist-counter-rotate pre-n n) ;;-> change wrist angle
             (send *ri* :start-grasp)
-
 
             ;;if n is dual contact
             (when (send n :get-value :islands)
@@ -364,7 +287,7 @@
                   )))
                   
             
-            
+            (send *ri* :wait-interpolation)
             (play-node-best n)
             (setq av (send *pr2* :angle-vector))
             (setq base (send *pr2* :copy-worldcoords))
@@ -397,6 +320,7 @@
                   spare-arm-av res)
               (format t  "USE MoveIt for ~A!~%" spare-arm)
               
+              (send *co* :clear-all)
               (dotimes (i 3)
                 (cond ((= i 0)
                        (play-node-best n))
@@ -405,26 +329,24 @@
                       ((= i 2)
                        (play-node-best next-n)))
 
-                (if res (return))
-                (send *co* :clear-all)
-                (dolist (obj (remove-if #'(lambda (x) (substringp nil (string (send x :name)))) (send *door* :links)))
-                  (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))
+                (let ((tmp-door (copy-object *door*)))
+                (dolist (obj (remove-if #'(lambda (x) (substringp nil (string (send x :name)))) (send tmp-door :links)))
+                  (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))))
                 
                 
-                ;; (play-middle-state n next-n 3 6 :approach-ik)
-                ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+              (play-node-best n)
+              (unless res
+                (pr2-relax-pose)
+                (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                 (unless res
-                  ;; (play-middle-state n next-n 1 3)
-                  ;; (play-middle-state n next-n 3 6)
-                  ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
+                  (send *pr2* :reset-pose)
+                  (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                   (unless res
-                    (send *pr2* :reset-pose)
-                    (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
-                    (unless res
                     (send *pr2* :reset-manip-pose)
                     (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                     ))))
-            ))
+            )
+          (send *co* :clear-all)
                     
           (when (send n :get-value :islands)
             (let ((rn (get-node (car (send n :get-value :islands))))
@@ -445,7 +367,7 @@
               ;;if n is dual contact, preapre to sift to single contact
               (let ((spare-arm (if (eq (send next-n :get-value :arm) :rarm) :larm :rarm))
                     spare-arm-av res)
-              ;;stop grasp if necessary
+                ;;stop grasp if necessary
                 (cond ((and (not (eq (send pre-n :get-value :contact-type) 'grasp)) (or (eq (send rn :get-value :contact-type) 'grasp) (eq (send rn :get-value :contact-type) 'grasp))) ;;pre not grasp -> either grasp
                        (unix:usleep (* 1000 1000)))
                       ((and (eq (send rn :get-value :contact-type) 'grasp) (eq (send ln :get-value :contact-type) 'grasp)) ;;pre grasp -> both grasp
@@ -461,12 +383,6 @@
                        (send *pr2* spare-arm :elbow-r :joint-angle (refine-continuous-joint-ang (send *pr2* spare-arm :elbow-r :joint-angle) 360))
                        (send *pr2* spare-arm :wrist-r :joint-angle (refine-continuous-joint-ang (send *pr2* spare-arm :wrist-r :joint-angle) 180))
                        (send *irtviewer* :draw-objects)
-                       ;; (format t  "Release prepare posture, uSE MoveIt for ~A!~%" spare-arm)
-                       ;; (send *co* :clear-all)
-                       ;; (dolist (obj (remove-if #'(lambda (x) (substringp nil (string (send x :name)))) (send *door* :links)))
-                       ;;   (pub-obj (car (send obj :bodies)) *pr2* "base_footprint"))
-                       ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
-                       ;; (send *ri* :wait-interpolation)
                        (send *ri* :angle-vector (send *pr2* :angle-vector))
                        (send *ri* :wait-interpolation)
                        ))
@@ -491,19 +407,12 @@
                   (send *pr2* spare-arm :angle-vector (get-tuckarm (if (eq spare-arm :rarm) :larm :rarm) :outside spare-arm))
                   (send *pr2* spare-arm :shoulder-r :joint-angle (if (eq spare-arm :rarm) -100 100))
                   (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
-                  ;; (play-middle-state n next-n 4 6)
-                  ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                   (unless res
                     (send *pr2* :reset-pose)
                     (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
-                    ;; (play-middle-state n next-n 1 3)
-                    ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                     (unless res
                       (send *pr2* :reset-manip-pose)
                     (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
-                      ;; (send *pr2* spare-arm :angle-vector (get-tuckarm (if (eq spare-arm :rarm) :larm :rarm) :outside spare-arm))
-                    ;; (send *pr2* spare-arm :shoulder-r :joint-angle (if (eq spare-arm :rarm) -100 100))
-                    ;; (setq res (send *ri* :angle-vector-motion-plan (send *pr2* :angle-vector) :move-arm spare-arm :use-torso nil))
                     ))))
               
 
@@ -558,6 +467,36 @@
           (push c cube-list))))
 
     (setq *obs-list* (reverse cube-list))))
+
+
+(defun pr2-relax-pose ()
+  (send *pr2* :larm :angle-vector #f(66.0749 39.4186 172.313 -70.4624 2.60698 -5.72958 -10.1163))
+  (send *pr2* :rarm :angle-vector #f(-66.0749 39.4186 -172.313 -70.4624 2.60698 -5.72958 -10.1163))
+  )
         
+(defun update-loaded-nodes (&key (robot *pr2*) (door *door*) (nodes *all-nodes*))
+  (let ((r-contact-pts (set-contact-points :rarm :robot robot))
+        (l-contact-pts (set-contact-points :larm :robot robot))
+        (obj-cds-list (send door :get-rear-touch-cds-list)))
+    (dolist (n nodes)
+      (send n :put-value :contact-point (elt (if (eq (send n :get-value :arm) :rarm) r-contact-pts l-contact-pts) (send n :get-value :contact-point-index)))
+      (case (send n :get-value :object-coords-index)
+            ('fk (send n :put-value :object-coords (send door :front-knob-coords)))
+            ('rk (send n :put-value :object-coords (send door :rear-knob-coords)))
+            (t (send n :put-value :object-coords (elt obj-cds-list (send n :get-value :object-coords-index)))))
+
+      (if (numberp (send n :get-value :object-coords-index))
+          (send n :put-value :ik-target-coords (send (send n :get-value :object-coords) :assoc (make-cascoords :coords (send (send (send (send n :get-value :object-coords) :copy-worldcoords) :translate *ik-target-shift*) :rotate (if (eq (send n :get-value :contact-point-index) 0) 0 pi/2) :y))))
+        (send n :put-value :ik-target-coords (send (send n :get-value :object-coords) :assoc (make-cascoords :coords (send (send (send (send (send n :get-value :object-coords) :copy-worldcoords) :rotate (if (eq (send n :get-value :object-coords-index) 'fk) 0 pi) :z) :rotate pi/2 :x) :translate #f(15 0 0)))))
+        ))))
+
+
+(defun save-data (path)
+  (dolist (n *all-nodes*)
+    (send n :put-value :contact-point nil)
+    (send n :put-value :object-coords nil)
+    (send n :put-value :ik-target-coords nil))
+
+  (dump-loadable-structure path *all-nodes* *bridge-nodes*))
 
     
