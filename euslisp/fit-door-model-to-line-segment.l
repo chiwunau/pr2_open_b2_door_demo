@@ -29,7 +29,12 @@
 
 
 (defun joint-state-cb (msgs)
-  (apply-joint_state msgs *pr2*))
+  (let (trans)
+    (apply-joint_state msgs *pr2*)
+    (setq trans (send *tfl* :lookup-transform "/odom_combined" "/base_footprint" (ros::time 0)))
+    (if (not *robot-start-cds*)
+        (setq *robot-start-cds* trans))
+    (send *pr2* :move-to (send *robot-start-cds* :transformation trans) :world)))
 
 (defun line-segment-cb (msgs)
   (ros::ros-info "line segment callback")
@@ -40,10 +45,10 @@
   (let ((marker-list (send msgs :markers))
         trans)
 
-    (setq trans (send *tfl* :lookup-transform "/odom_combined" "/base_footprint" (ros::time 0)))
-    (if (not *robot-start-cds*)
-        (setq *robot-start-cds* trans))
-    (send *pr2* :move-to (send *robot-start-cds* :transformation trans) :world)
+    ;; (setq trans (send *tfl* :lookup-transform "/odom_combined" "/base_footprint" (ros::time 0)))
+    ;; (if (not *robot-start-cds*)
+    ;;     (setq *robot-start-cds* trans))
+    ;; (send *pr2* :move-to (send *robot-start-cds* :transformation trans) :world)
 
     (dolist (mk marker-list)
       (let (p0 p1 l)
@@ -94,7 +99,7 @@
       (setq tmp-list nil)
       (setq seed (car all-vertices))
       (dolist (vertex all-vertices)
-        (if (< (norm (v- seed vertex)) 100)
+        (if (< (norm (v- seed vertex)) 50)
             (push vertex tmp-list)))
       (dolist (member tmp-list)
         (setq all-vertices (remove member all-vertices)))
@@ -102,6 +107,8 @@
 
     (let* ((length-list (mapcar #'length clusters))
            pos1 pos2 max1 max2 tmp)
+      (unless (> (length length-list) 1)
+        (return-from refine-line-segments-group nil))
       (setq max1 (find-extream length-list #'identity #'>))
       (setq pos1 (position max1 length-list))
       (setq tmp (remove max1 length-list :count 1))
@@ -151,7 +158,7 @@
         door)))
 
 (defun test (&key (max-wait-sec 0.2))
-  (clear-scene)
+  ;; (clear-scene)
   (let ((st-tm (ros::time-now))
         (count-cb 0)
         accumulated-line-segments
@@ -163,26 +170,49 @@
       (ros::spin-once)
       (when *cb-line-segments*
         (incf count-cb)
-        (draw-line-segments *cb-line-segments*)
+        ;; (draw-line-segments *cb-line-segments*)
         (setq accumulated-line-segments (append accumulated-line-segments *cb-line-segments*)))
       )
-    (clear-scene)
+    ;; (clear-scene)
     (format t "number of callback:~A~%" count-cb)
   
   ;;;FIRST REFINEMENT
     (setq line-clusters (clustering-line-segments accumulated-line-segments))
     (dolist (line-cluster line-clusters)
-      (push (refine-line-segments-group line-cluster) refined-line-segments))
+      (if (= (length line-cluster) 1)
+          (push (car line-cluster) refined-line-segments)
+        (let ((tmp (refine-line-segments-group line-cluster)))
+          (if tmp
+              (push tmp refined-line-segments)))))
     ;;SECOND REFINEMENT
     (setq line-clusters (clustering-line-segments refined-line-segments))
     (setq refined-line-segments nil)
       (dolist (line-cluster line-clusters)
-        (push (refine-line-segments-group line-cluster) refined-line-segments))
+        (if (= (length line-cluster) 1)
+            (push (car line-cluster) refined-line-segments)
+          (let ((tmp (refine-line-segments-group line-cluster)))
+            (if tmp
+                (push tmp refined-line-segments)))))
       (when refined-line-segments
         (push (send *pr2* :angle-vector) *all-robot-pose*)
         (push (send *pr2* :copy-worldcoords) *all-robot-base*)
         (push refined-line-segments *all-refined-line-segments*)
-        (draw-line-segments refined-line-segments))))
+        ;; (draw-line-segments refined-line-segments)
+        )))
+
+(defun test-manip-exp (&key (max-wait-sec 0.2))
+  (clear-scene)
+  (let ((st-tm (ros::time-now))
+        (count-cb 0)
+        accumulated-line-segments
+        line-clusters
+        refined-line-segments)
+    (while (and (ros::ok) (ros::time<= (ros::time- (ros::time-now) st-tm) (ros::time max-wait-sec)))
+      (ros::sleep)
+      (ros::spin-once)
+      )
+    (push (send *pr2* :angle-vector) *all-robot-pose*)
+    (push (send *pr2* :copy-worldcoords) *all-robot-base*)))
 
 
 (defun clustering-line-segments (target &optional (ang-thres 5))
@@ -211,6 +241,7 @@
   (setq *robot-start-cds* nil)
   (setq *all-robot-pose* nil)
   (setq *all-robot-base* nil)
+  (setq *door-plane-line* nil)
 )
 
 (defun clear-scene()
@@ -313,7 +344,6 @@
               (setq dist-list (mapcar #'(lambda (ln) (send ln :distance (send arm-proj-cds :pos))) (elt *move-line-seq* i))) ;;for robot open
               (setq min-dist (find-extream dist-list #'identity #'<))
               (setq posi (position min-dist dist-list))
-              
               ;; (setq candidate (elt (elt *move-line-seq* i) posi))
               (if (and (> (elt (send (elt (elt *move-line-seq* i) posi) :point 0.5) 0) 0)
                        (<= (send (elt (elt *move-line-seq* i) posi) :distance (send arm-proj-cds :pos)) 50) ;;for robot open
@@ -321,7 +351,6 @@
                        )
                   (push (elt (elt *move-line-seq* i) posi) *final-line-seq*)
                 (push nil *final-line-seq*)))
-          
           (progn ;;human open
             (dolist (ml (elt *move-line-seq* i))
               (if (and (< (send ml :distance *door-plane-line*) 500)
@@ -410,6 +439,10 @@
 (defun sampling ()
   (do-until-key
    (test :max-wait-sec 0.1))) ;;sampling data
+(defun sampling-manip ()
+  (do-until-key
+   (test-manip-exp :max-wait-sec 0.1))) ;;sampling data
+
 (progn (setq *all-robot-pose* (reverse *all-robot-pose*)) (print t))
 (progn (setq *all-robot-base* (reverse *all-robot-base*)) (print t))
 (progn (setq *all-refined-line-segments* (reverse *all-refined-line-segments*)) (print t))
@@ -421,15 +454,15 @@
 ;; #f(846.287 836.256 0) ground_true robot_open_1
 ;; (setq circle-center #f(824.15008 876.45468 0)) ;;robot_open_1
 ;; (setq circle-center #f(846.287 836.256 0))
-(setq circle-radius-true 821.0)
+;; (setq circle-radius-true 821.0)
 ;;Cx=883.01419  Cy=838.97770  R=737.25269 ;;estimated from waypoints of robot_open_2
 ;; #f(825.648 795.87 0) ground_true robot_open_2
-(setq circle-center #f(825.648 795.87 0))
+;; (setq circle-center #f(825.648 795.87 0))
 ;;(setq circle-center #f(883.01419 838.97770 0)) ;;robot_open_2
 (output_detected_door_angle)
-;; ;;-----------------------------------------------------;;
+;;; ;;-----------------------------------------------------;;
 
-(dolist (w *waypoints*) (format t "~A ~A~%" (elt w 0) (elt w 1)))
+(dolist (w *waypoints*) (format t "~A ~A ~A~%" (elt w 0) (elt w 1) (elt w 2)))
 ;; ;;----draw moving seq-------------;;;
 (dotimes (i (length *move-line-seq*))
   (if (elt *move-line-seq* i)
@@ -440,9 +473,14 @@
    (clear-scene))
 ;; ;;----draw moving seq-------------;;;
 (dotimes (i (length *final-line-seq*))
+  (draw-line-segments (list *door-plane-line*) :color :green)
   (if (elt *final-line-seq* i)
         (draw-line-segments (list (elt *final-line-seq* i)) :color :red :fat 3))
+       ;; (draw-line-segments (list (elt *final-line-seq* i)) :color :red))
   (draw-line-segments (remove (elt *final-line-seq* i) (elt *all-refined-line-segments* i)) :color :grey :fat 3)
+  ;; (draw-line-segments (remove (elt *final-line-seq* i) (elt *all-refined-line-segments* i)) :color :grey)
+  ;; (unix:usleep (* 1000 50))
+  ;; (clear-scene)
   )
 
 ;; ;;----------produce kinemaitc model graph of thesis--------------------;;
@@ -452,30 +490,30 @@
 ;;   (send *irtviewer* :objects *door*))
 ;; ;;----------produce kinemaitc model graph of thesis--------------------;;
 
-(let (norm-errors)
-  (dolist (rc *rotation-centers*)
-    (if rc
-        (push (norm (v- circle-center rc)) norm-errors)
-      (push nil norm-errors)))
-  (setq norm-errors (reverse norm-errors))
-  norm-errors)
+;; (let (norm-errors)
+;;   (dolist (rc *rotation-centers*)
+;;     (if rc
+;;         (push (norm (v- circle-center rc)) norm-errors)
+;;       (push nil norm-errors)))
+;;   (setq norm-errors (reverse norm-errors))
+;;   norm-errors)
 
-(dolist (rc *rotation-centers*)
-  (if rc
-      (let ((c (make-cube 15 10 15)))
-        (send c :translate rc)
-        (send c :set-color :red)
-        (send *irtviewer* :objects c))))
-(let ((c (make-cube 15 10 15)))
-  (send c :translate circle-center)
-  (send c :set-color :blue)
-  (send *irtviewer* :objects c))
+;; (dolist (rc *rotation-centers*)
+;;   (if rc
+;;       (let ((c (make-cube 15 10 15)))
+;;         (send c :translate rc)
+;;         (send c :set-color :red)
+;;         (send *irtviewer* :objects c))))
+;; (let ((c (make-cube 15 10 15)))
+;;   (send c :translate circle-center)
+;;   (send c :set-color :blue)
+;;   (send *irtviewer* :objects c))
 
 
-(let ((c (make-cube 15 10 15)))
-  (send c :translate #f(883.01419 838.97770 0)) ;;extimated from end effector
-  (send c :set-color :yellow)
-  (send *irtviewer* :objects c))
+;; (let ((c (make-cube 15 10 15)))
+;;   (send c :translate #f(883.01419 838.97770 0)) ;;extimated from end effector
+;;   (send c :set-color :yellow)
+;;   (send *irtviewer* :objects c))
 
 
 
@@ -496,9 +534,13 @@
   ;; (unix:usleep (* 1000 500))
   
 
-(send c :translate #f(0  678 -945))
-(send c :translate #f(60 0 0))
+;; (send c :translate #f(0  678 -945))
+;; (send c :translate #f(60 0 0))
 
 
+;; (dotimes (i (length *all-robot-pose*))
+;;   (send *pr2* :angle-vector (elt *all-robot-pose* i))
+;;   (send *pr2* :move-to (elt *all-robot-base* i) :world)
+;;   (send *irtviewer* :draw-objects))
 ;;ground_true of robot_1
 ;;(#<coordinates #Xa0f6ba8  786.307 837.782 4.039 / -0.025 0.0 0.0> #<cascaded-coords #X8499290 :larm-end-coords  769.062 160.001 949.039 / 0.054 -0.039 1.223> #<pr2-sensor-robot #X716c3a0 pr2  0.0 0.0 0.0 / 0.0 0.0 0.0>)
