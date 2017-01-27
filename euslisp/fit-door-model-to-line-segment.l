@@ -99,7 +99,7 @@
       (setq tmp-list nil)
       (setq seed (car all-vertices))
       (dolist (vertex all-vertices)
-        (if (< (norm (v- seed vertex)) 100)
+        (if (< (norm (v- seed vertex)) 50)
             (push vertex tmp-list)))
       (dolist (member tmp-list)
         (setq all-vertices (remove member all-vertices)))
@@ -107,6 +107,8 @@
 
     (let* ((length-list (mapcar #'length clusters))
            pos1 pos2 max1 max2 tmp)
+      (unless (> (length length-list) 1)
+        (return-from refine-line-segments-group nil))
       (setq max1 (find-extream length-list #'identity #'>))
       (setq pos1 (position max1 length-list))
       (setq tmp (remove max1 length-list :count 1))
@@ -156,7 +158,7 @@
         door)))
 
 (defun test (&key (max-wait-sec 0.2))
-  (clear-scene)
+  ;; (clear-scene)
   (let ((st-tm (ros::time-now))
         (count-cb 0)
         accumulated-line-segments
@@ -168,26 +170,35 @@
       (ros::spin-once)
       (when *cb-line-segments*
         (incf count-cb)
-        (draw-line-segments *cb-line-segments*)
+        ;; (draw-line-segments *cb-line-segments*)
         (setq accumulated-line-segments (append accumulated-line-segments *cb-line-segments*)))
       )
-    (clear-scene)
+    ;; (clear-scene)
     (format t "number of callback:~A~%" count-cb)
   
   ;;;FIRST REFINEMENT
     (setq line-clusters (clustering-line-segments accumulated-line-segments))
     (dolist (line-cluster line-clusters)
-      (push (refine-line-segments-group line-cluster) refined-line-segments))
+      (if (= (length line-cluster) 1)
+          (push (car line-cluster) refined-line-segments)
+        (let ((tmp (refine-line-segments-group line-cluster)))
+          (if tmp
+              (push tmp refined-line-segments)))))
     ;;SECOND REFINEMENT
     (setq line-clusters (clustering-line-segments refined-line-segments))
     (setq refined-line-segments nil)
       (dolist (line-cluster line-clusters)
-        (push (refine-line-segments-group line-cluster) refined-line-segments))
+        (if (= (length line-cluster) 1)
+            (push (car line-cluster) refined-line-segments)
+          (let ((tmp (refine-line-segments-group line-cluster)))
+            (if tmp
+                (push tmp refined-line-segments)))))
       (when refined-line-segments
         (push (send *pr2* :angle-vector) *all-robot-pose*)
         (push (send *pr2* :copy-worldcoords) *all-robot-base*)
         (push refined-line-segments *all-refined-line-segments*)
-        (draw-line-segments refined-line-segments))))
+        ;; (draw-line-segments refined-line-segments)
+        )))
 
 (defun test-manip-exp (&key (max-wait-sec 0.2))
   (clear-scene)
@@ -230,6 +241,7 @@
   (setq *robot-start-cds* nil)
   (setq *all-robot-pose* nil)
   (setq *all-robot-base* nil)
+  (setq *door-plane-line* nil)
 )
 
 (defun clear-scene()
@@ -332,7 +344,6 @@
               (setq dist-list (mapcar #'(lambda (ln) (send ln :distance (send arm-proj-cds :pos))) (elt *move-line-seq* i))) ;;for robot open
               (setq min-dist (find-extream dist-list #'identity #'<))
               (setq posi (position min-dist dist-list))
-              
               ;; (setq candidate (elt (elt *move-line-seq* i) posi))
               (if (and (> (elt (send (elt (elt *move-line-seq* i) posi) :point 0.5) 0) 0)
                        (<= (send (elt (elt *move-line-seq* i) posi) :distance (send arm-proj-cds :pos)) 50) ;;for robot open
@@ -340,7 +351,6 @@
                        )
                   (push (elt (elt *move-line-seq* i) posi) *final-line-seq*)
                 (push nil *final-line-seq*)))
-          
           (progn ;;human open
             (dolist (ml (elt *move-line-seq* i))
               (if (and (< (send ml :distance *door-plane-line*) 500)
@@ -444,10 +454,10 @@
 ;; #f(846.287 836.256 0) ground_true robot_open_1
 ;; (setq circle-center #f(824.15008 876.45468 0)) ;;robot_open_1
 ;; (setq circle-center #f(846.287 836.256 0))
-(setq circle-radius-true 821.0)
+;; (setq circle-radius-true 821.0)
 ;;Cx=883.01419  Cy=838.97770  R=737.25269 ;;estimated from waypoints of robot_open_2
 ;; #f(825.648 795.87 0) ground_true robot_open_2
-(setq circle-center #f(825.648 795.87 0))
+;; (setq circle-center #f(825.648 795.87 0))
 ;;(setq circle-center #f(883.01419 838.97770 0)) ;;robot_open_2
 (output_detected_door_angle)
 ;;; ;;-----------------------------------------------------;;
