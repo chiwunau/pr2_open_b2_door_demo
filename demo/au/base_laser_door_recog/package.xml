@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package>
-  <name>pr2_open_b2_door_demo</name>
+  <name>base_laser_door_recog</name>
   <version>0.0.0</version>
-  <description>The pr2_open_b2_door_demo package</description>
+  <description>The base_laser_door_recog package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag --> 
   <!-- Example:  -->

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(pr2_open_b2_door_demo)
+project(base_laser_door_recog)
 
 
 find_package(catkin REQUIRED COMPONENTS
